@@ -219,11 +219,9 @@ async function addCaches(add) {
   const names = await caches.keys();
   add('cache names', names.join(', ') || 'none');
 
-  for (const name of ['app-shell', 'format-bridge']) {
-    if (!names.includes(name)) {
-      add(`${name} entries`, 'cache missing');
-      continue;
-    }
+  // Precache lives in Workbox's own cache (workbox-precache-v2-*), not in the
+  // 'app-shell' runtime cache, which only fills when a navigation misses precache.
+  for (const name of names) {
     const cache = await caches.open(name);
     const keys = await cache.keys();
     add(`${name} entries`, String(keys.length));

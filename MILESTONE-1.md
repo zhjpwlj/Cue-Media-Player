@@ -10,7 +10,7 @@ Legend: `[x]` verified locally from the built artifact · `[ ]` requires a devic
 - [x] `package.json` build script — `vite build` → esbuild SW bundle → `workbox injectManifest`. See Deviation 1.
 - [x] `public/_headers` — COOP/COEP/CORP, cache policy, WASM immutable rule before `/assets/*`.
 - [x] `public/manifest.json` — name/short_name `Cue`, `id`/`start_url`/`scope` `/`, `display: standalone`, `orientation: any`, `#0f0f0f`, 4 icons. No `display_override`.
-- [x] `public/assets/icons/` — `icon-192.png`, `icon-512.png`, `maskable-512.png`, `apple-touch-icon-180.png`. All 8-bit RGB, opaque, valid PNG; no alpha (iOS/Android render transparency inconsistently).
+- [x] `public/assets/icons/` — `icon-192.png`, `icon-512.png`, `maskable-512.png`, `apple-touch-icon-180.png`. Amber `#f2b544` play triangle on `#0f0f0f`, full-bleed. All 8-bit RGB, opaque, valid PNG; no alpha (iOS/Android render transparency inconsistently). Center pixel `srgb(242,181,68)` on all four.
 - [x] `public/assets/silent.mp3` — 0.5 s, 44.1 kHz mono, `volumedetect` mean/max −91.0 dB (digital silence). Ear check still worth doing.
 - [x] `src/index.html` — `viewport-fit=cover`, `<title>Cue</title>`, `apple-mobile-web-app-title=Cue`, `status-bar-style=black-translucent`, `theme-color=#0f0f0f`, manifest + apple-touch-icon links.
 - [x] `src/css/base.css` — all 23 §8.4 variables present, `100dvh`, `env(safe-area-inset-*)` padding, reduced-motion guard, accent focus ring.
@@ -21,15 +21,17 @@ Legend: `[x]` verified locally from the built artifact · `[ ]` requires a devic
 
 ## Verification on real iOS 26.x device (installed PWA)
 
-- [ ] Launch installed PWA. No browser chrome.
-- [ ] Open the diagnostics panel (five quick taps **or** a ~0.9 s hold on the `cue` header). `SharedArrayBuffer: function`.
-- [ ] Panel `storage.persist()` / `storage.persisted()` values recorded (actual values, not "logged").
-- [ ] No Cross-Origin-Embedder-Policy warnings. (Panel `crossOriginIsolated: true`; no tethered console available.)
-- [ ] `innerHeight / visualViewport / 100dvh` agree; `safe-area` insets non-zero on a notched device; no scroll bar, no gap under status bar, no home-indicator overlap.
+- [x] Launch installed PWA. No browser chrome. (`standalone: true`, `navigator.standalone: true`)
+- [x] Diagnostics panel opens in the installed app (long press on `cue`). `SharedArrayBuffer: function`.
+- [x] Panel `storage.persist(): true` / `storage.persisted(): true` — recorded, not "logged".
+- [x] `crossOriginIsolated: true` — COOP/COEP verified on-device; no tethered console needed.
+- [x] `innerHeight / visualViewport / 100dvh: 810 / 810 / 810`; `safe-area t r b l: 20px 0px 0px 0px`; no scroll bar or gap under the status bar observed.
 - [ ] Airplane mode on. Relaunch. Shell renders.
-- [ ] Panel: `app-shell entries: 10`, `format-bridge entries: 0` on first install.
+- [ ] Panel reports `10` entries for `workbox-precache-v2-*` and `0` for `format-bridge` on first install. (Earlier panel build only printed cache names; re-check after the icon deploy.)
 - [ ] ~~Airplane mode off, poll 60 s: 4 files in `format-bridge`.~~ **Blocked by design — see Deviation 6.** Cannot pass until M15 ships the WASM binaries.
 - [ ] Background → foreground: no new network requests to `/assets/wasm/*`. (Only meaningful after Deviation 6 clears.)
+
+Device actually used: **iPadOS/Safari 18.3** per the panel UA (`Version/18.3`), not the spec floor of 26.x. Re-run on 26.x when available.
 
 ## Verification on macOS Safari 26.x
 
@@ -75,6 +77,8 @@ Legend: `[x]` verified locally from the built artifact · `[ ]` requires a devic
 6. **`format-bridge` cannot populate in Milestone 1.** The checklist asks to poll until the 4 WASM files appear, but `public/assets/wasm/*` are Milestone 15–16 deliverables and are intentionally absent. Stub binaries were rejected: `precacheFormatBridge()` skips keys that already exist, so a placeholder would be cached once and never replaced by the real module. The write path itself is verified in the VM test above (4 assets, no `?pending`, idempotent re-run). Until M15, each visibility change retries 4 fetches that 404 and logs `format-bridge precache failed` — no app-shell impact.
 7. **On-device diagnostics panel (`src/diagnostics.js`).** No tethered Mac, so the M1 values would otherwise be unreadable on iPad. Open with five quick taps or a ~0.9 s long press on the `cue` header (long press is immune to iOS double-tap zoom, which swallowed the first tap-only trigger; the header also gets `touch-action: manipulation`). Panel prints build filename, `SharedArrayBuffer`, `crossOriginIsolated`, `persist()`/`persisted()`, storage estimate, SW controller/scope/state/waiting, cache entry counts, each converter asset's cached byte size and content-type, `innerHeight`/`visualViewport`/`100dvh`, safe-area insets, and UA. It also exposes an **Apply update** button that dispatches the same `sw-apply-update` event the future toast will use. Deviation: production code, ~210 lines, always loaded (a gesture gates it). Remove at M22 or keep as the permanent fallback.
 8. **`npm test` uses `node --test`, not vitest.** Two invariants guard the bugs found during M1: the diagnostics panel must inspect the same four converter URLs as the SW, and `public/404.html` must exist. `vitest@^1` is still installed per the deliverable but unused this milestone.
+9. **Icon is an amber play triangle, not the red cue dot.** Requested after first deploy. Accent variables moved to `#f2b544` / `#d99a2b` / `#0f0f0f` (dark text on amber), and the 404 link matches. Icons stay full-bleed squares so the OS applies its own mask.
+10. **Precache cache name.** The checklist and first panel reported `app-shell`, but `precacheAndRoute` stores under `workbox-precache-v2-<scope>`. The `app-shell` cache only fills when a navigation misses precache (e.g. `/?v=3`). Panel now prints entry counts for every cache, and the check is "10 entries in `workbox-precache-v2-*`".
 
 ## Explicit non-goals (untouched)
 
