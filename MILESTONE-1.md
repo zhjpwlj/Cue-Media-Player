@@ -29,6 +29,7 @@ Legend: `[x]` verified locally from the built artifact · `[ ]` requires a devic
 - [x] `scrollHeight / innerHeight: 810 / 810`; no page movement on drag after fixing the root. iOS rubber-band on the document is gone (`body` fixed, `.app-main` owns scrolling).
 - [x] Airplane mode on. Relaunch. Shell renders and works. iOS still shows "Turn Off Airplane Mode to Access Data" — that dialog comes from the browser's own `/sw.js` update probe, which a SW cannot serve or a page cancel. Cosmetic; offline behavior passes.
 - [x] Precache cache is populated: offline cold launch renders and plays from cache. Exact `workbox-precache-v2-*` count not read on device; the 10-entry manifest is artifact-verified locally.
+  - Observed `16` after several deploys: a **waiting** SW adds its revisions to the same cache before the old ones are removed (10 + 3 + 3 for two pending builds). Expect exactly `10` once `sw.waiting: no`. A count above 10 with `waiting: no` is a real cleanup failure.
 - [ ] ~~Airplane mode off, poll 60 s: 4 files in `format-bridge`.~~ **Blocked by design — see Deviation 6.** Cannot pass until M15 ships the WASM binaries.
 - [ ] Background → foreground: no new network requests to `/assets/wasm/*`. (Only meaningful after Deviation 6 clears.)
 
