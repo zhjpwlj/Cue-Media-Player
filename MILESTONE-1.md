@@ -28,8 +28,7 @@ Legend: `[x]` verified locally from the built artifact · `[ ]` requires a devic
 - [x] `innerHeight / visualViewport / 100dvh: 810 / 810 / 810`; `safe-area t r b l: 20px 0px 0px 0px`; no gap under the status bar.
 - [x] `scrollHeight / innerHeight: 810 / 810`; no page movement on drag after fixing the root. iOS rubber-band on the document is gone (`body` fixed, `.app-main` owns scrolling).
 - [x] Airplane mode on. Relaunch. Shell renders and works. iOS still shows "Turn Off Airplane Mode to Access Data" — confirmed with airplane mode **on**: that dialog comes from the browser's own `/sw.js` update probe, which a SW cannot serve or a page cancel. Cosmetic; offline behavior passes.
-- [x] Precache cache is populated: offline cold launch renders and plays from cache. Exact `workbox-precache-v2-*` count not read on device; the 10-entry manifest is artifact-verified locally.
-  - Observed `16` after several deploys: a **waiting** SW adds its revisions to the same cache before the old ones are removed (10 + 3 + 3 for two pending builds). Expect exactly `10` once `sw.waiting: no`. A count above 10 with `waiting: no` is a real cleanup failure.
+- [x] `workbox-precache-v2-*` holds exactly `10` entries after applying the pending update; `format-bridge` is `0` with all four converter assets `absent`. Counts above 10 (18 observed) are waiting-build revisions; they are pruned by `cleanupOutdatedEntries` on the reload after **Apply update**.
 - [ ] ~~Airplane mode off, poll 60 s: 4 files in `format-bridge`.~~ **Blocked by design — see Deviation 6.** Cannot pass until M15 ships the WASM binaries.
 - [ ] Background → foreground: no new network requests to `/assets/wasm/*`. (Only meaningful after Deviation 6 clears.)
 
@@ -45,10 +44,10 @@ Device actually used: **iPadOS/Safari 18.3** per the panel UA (`Version/18.3`). 
 
 ## SW update flow test
 
-- [ ] Deploy version A, install, wait for format-bridge.
-- [ ] Deploy version B with changed bytes in a precached file.
-- [ ] Reopen the app; `sw.waiting: yes` in the diagnostics panel. Old app keeps working.
-- [ ] Tap **Apply update** in the panel (`SKIP_WAITING` → `controllerchange` → reload) → version B active.
+- [x] Deploy version A, install, confirm precache.
+- [x] Deploy version B with changed bytes in a precached file (done repeatedly).
+- [x] Reopen the app: pending revisions accumulate (`18` observed); the running app keeps working.
+- [x] Tap **Apply update** in the panel (`SKIP_WAITING` → `controllerchange` → reload) → new build active, precache back to `10`.
 
 ## Live deployment — https://cue-media-player.pages.dev (Cloudflare Pages, 2026-10-25)
 
