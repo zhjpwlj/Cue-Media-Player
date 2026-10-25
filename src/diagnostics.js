@@ -226,6 +226,16 @@ async function addCaches(add) {
     const cache = await caches.open(name);
     const keys = await cache.keys();
     add(`${name} entries`, String(keys.length));
+    if (name.startsWith('workbox-precache')) {
+      // Revisions are the cache key suffix; duplicates here mean activation
+      // cleanup never ran.
+      add('  keys', keys.map((k) => {
+        const url = new URL(k.url);
+        const rev = url.searchParams.get('__WB_REVISION__');
+        return url.pathname + (rev ? `#${rev.slice(0, 6)}` : '');
+      }).join(' | '));
+      continue;
+    }
     if (name !== 'format-bridge') continue;
     for (const url of WASM_URLS) {
       const res = await cache.match(url);
