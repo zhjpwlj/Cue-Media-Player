@@ -21,3 +21,8 @@ test('public/404.html exists', () => {
   // including /assets/wasm/*, which the SW would then cache as a converter binary.
   assert.ok(existsSync(join(root, 'public', '404.html')));
 });
+
+test('footer version matches package.json', () => {
+  const { version } = require(join(root, 'package.json'));
+  assert.ok(read('src/index.html').includes(`>v${version}<`), 'footer version drifted from package.json');
+});

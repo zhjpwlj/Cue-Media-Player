@@ -32,14 +32,18 @@
   box-sizing: border-box;
 }
 
-html {
-  background: var(--bg-primary);
+html,
+body {
+  margin: 0;
+  height: 100%;
+  /* iOS: root rubber-band still scrolls a page whose content exactly fits. */
+  overflow: hidden;
 }
 
 body {
-  margin: 0;
-  min-height: 100dvh;
-  /* iOS: never 100vh — dvh tracks the collapsing status bar / home indicator. */
+  /* iOS: fixed root is the reliable bounce killer in a standalone PWA. */
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
@@ -56,9 +60,8 @@ body {
   overscroll-behavior: none;
 }
 
-/* Fills the body's content box. Do not add 100dvh here: body already owns the
-   viewport height and its safe-area padding, so a second 100dvh scrolls by
-   exactly the inset (20px on iPad). */
+/* Fills the body's content box. Do not add 100dvh here: body owns the
+   viewport and its safe-area padding, so a second 100dvh scrolls by the inset. */
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -70,6 +73,7 @@ body {
   display: flex;
   align-items: center;
   height: var(--header-height);
+  flex: 0 0 auto;
   padding: 0 16px;
   font-size: 20px;
   font-weight: 600;
@@ -84,6 +88,19 @@ body {
 
 .app-main {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.app-footer {
+  position: fixed;
+  right: calc(env(safe-area-inset-right) + 8px);
+  bottom: calc(env(safe-area-inset-bottom) + 6px);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  pointer-events: none;
 }
 
 :focus-visible {

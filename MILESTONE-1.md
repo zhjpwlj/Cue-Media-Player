@@ -65,7 +65,7 @@ Device actually used: **iPadOS/Safari 18.3** per the panel UA (`Version/18.3`), 
 - VM smoke test of built SW: `install/activate/fetch/message` listeners registered; `PRECACHE_FORMAT_BRIDGE` writes exactly 4 assets, leaves no `?pending` key, re-run hits cache 4×; `SKIP_WAITING` calls `self.skipWaiting()` inside `waitUntil`.
 - `vite preview` returns 200 for `/`, `/sw.js`, `/manifest.json`, `/_headers`, `silent.mp3`, `icon-192.png`; `/sw.js` served `Cache-Control: no-cache`.
 - No `console.log` in `src/`.
-- `npm test` → 2/2 pass (`node --test`): converter-URL drift guard, `public/404.html` presence guard.
+- `npm test` → 3/3 pass (`node --test`): converter-URL drift guard, `public/404.html` presence guard, footer-version guard.
 - `src/diagnostics.js` is bundled into the built JS and executes after DOM parse (module scripts are deferred).
 
 ## Deviations from spec
@@ -81,6 +81,9 @@ Device actually used: **iPadOS/Safari 18.3** per the panel UA (`Version/18.3`), 
 9. **Icon is an amber play triangle, not the red cue dot.** Requested after first deploy. Accent variables moved to `#f2b544` / `#d99a2b` / `#0f0f0f` (dark text on amber), and the 404 link matches. Icons stay full-bleed squares so the OS applies its own mask.
 10. **Precache cache name.** The checklist and first panel reported `app-shell`, but `precacheAndRoute` stores under `workbox-precache-v2-<scope>`. The `app-shell` cache only fills when a navigation misses precache (e.g. `/?v=3`). Panel now prints entry counts for every cache, and the check is "10 entries in `workbox-precache-v2-*`".
 11. **Safe-area double count fixed.** `body` had `min-height: 100dvh` plus `padding-top: env(...)`, while `.app-shell` also claimed `100dvh`; border-box puts the inset inside the viewport height, so the document was taller by exactly the inset (20 px on iPad) and scrolled. Body is now the flex column; `.app-shell` uses `flex: 1`. Panel prints `scrollHeight / innerHeight` so this is measurable on-device instead of eyeballed.
+12. **Root rubber-band scroll.** With `810 / 810` the content already fit; the movement was iOS bouncing the root document. `html, body` now set `height: 100%; overflow: hidden`, `body` is `position: fixed; inset: 0`, and `.app-main` owns scrolling (`overflow-y: auto; overscroll-behavior: contain`). Views added later must scroll inside `.app-main`, not rely on document scroll.
+13. **Version label.** `v0.1.0` bottom-right, safe-area aware, `pointer-events: none`. A test pins it to `package.json`; bump both when the version changes.
+14. **Converter precache skips offline.** `triggerFormatBridgePrecache()` and its `visibilitychange` retry now return early when `!navigator.onLine`. Without this, the four failing WASM fetches offline raise iOS's "Turn Off Airplane Mode to Access Data" alert while the cached shell keeps working.
 
 ## Explicit non-goals (untouched)
 

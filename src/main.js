@@ -37,6 +37,8 @@ async function requestPersistentStorage() {
 // Returns once the message is sent — the actual download happens in the SW.
 // Page retries on visibilitychange → visible until all 4 files are cached.
 async function triggerFormatBridgePrecache(reg) {
+  // Offline, these fetches hard-fail and iOS raises "Turn Off Airplane Mode".
+  if (!navigator.onLine) return;
   const ready = await navigator.serviceWorker.ready;
   const active = ready.active;
   if (!active) return;
@@ -57,6 +59,7 @@ async function triggerFormatBridgePrecache(reg) {
 
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible') return;
+    if (!navigator.onLine) return;
     const fresh = await Promise.all(required.map((u) => cache.match(u)));
     if (fresh.every(Boolean)) return;
     trigger();
