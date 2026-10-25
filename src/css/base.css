@@ -69,6 +69,11 @@ body {
   font-weight: 600;
   letter-spacing: -0.01em;
   border-bottom: 1px solid var(--border-color);
+  /* iOS: double-tap zooms by default; diagnostics uses multi-tap. */
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .app-main {

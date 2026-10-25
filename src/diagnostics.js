@@ -3,7 +3,8 @@
 // gains a real inspector; nothing here runs unless the panel is opened.
 
 const TAP_COUNT = 5;
-const TAP_WINDOW_MS = 700;
+const TAP_WINDOW_MS = 1500;
+const HOLD_MS = 900;
 const WASM_URLS = [
   '/assets/wasm/ffmpeg-audio.wasm',
   '/assets/wasm/ffmpeg-audio.worker.js',
@@ -12,20 +13,41 @@ const WASM_URLS = [
 ];
 
 let tapTimes = [];
+let holdTimer = null;
 let booted = false;
 document.addEventListener('boot-complete', () => {
   booted = true;
 });
 
-document.getElementById('app-header')?.addEventListener('pointerdown', () => {
+// Two triggers: five quick taps, or a long press. Long press is immune to
+// iOS double-tap zoom, which swallows rapid taps without touch-action.
+const header = document.getElementById('app-header');
+header?.addEventListener('pointerdown', (e) => {
+  // Session tabs and buttons land in this header at M9; never hijack them.
+  if (e.target.closest('button, a, input, select, textarea, [role="tab"]')) return;
   const now = Date.now();
   tapTimes = tapTimes.filter((t) => now - t < TAP_WINDOW_MS);
   tapTimes.push(now);
   if (tapTimes.length >= TAP_COUNT) {
+    cancelHold();
     tapTimes = [];
     togglePanel();
+    return;
   }
+  cancelHold();
+  holdTimer = setTimeout(() => {
+    tapTimes = [];
+    togglePanel();
+  }, HOLD_MS);
 });
+header?.addEventListener('pointerup', cancelHold);
+header?.addEventListener('pointercancel', cancelHold);
+header?.addEventListener('pointerleave', cancelHold);
+
+function cancelHold() {
+  clearTimeout(holdTimer);
+  holdTimer = null;
+}
 
 function togglePanel() {
   const existing = document.getElementById('diagnostics');
@@ -113,6 +135,7 @@ async function snapshot() {
   const add = (key, value) => lines.push(`${key}: ${value}`);
 
   add('url', location.href);
+  add('build', [...document.scripts].map((s) => s.src.split('/').pop()).join(', ') || 'inline');
   add('standalone', matchMedia('(display-mode: standalone)').matches);
   add('navigator.standalone', String(navigator.standalone));
   add('SharedArrayBuffer', typeof SharedArrayBuffer);
