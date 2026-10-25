@@ -148,6 +148,7 @@ async function snapshot() {
   const dvh = Math.round(probe.getBoundingClientRect().height);
   probe.remove();
   add('innerHeight / visualViewport / 100dvh', `${innerHeight} / ${Math.round(window.visualViewport?.height ?? 0)} / ${dvh}`);
+  add('scrollHeight / innerHeight', `${document.documentElement.scrollHeight} / ${innerHeight}`);
   add('safe-area t r b l', safeAreaInsets());
 
   await addStorage(add);

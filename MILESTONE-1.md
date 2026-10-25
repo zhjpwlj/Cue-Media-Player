@@ -25,7 +25,8 @@ Legend: `[x]` verified locally from the built artifact · `[ ]` requires a devic
 - [x] Diagnostics panel opens in the installed app (long press on `cue`). `SharedArrayBuffer: function`.
 - [x] Panel `storage.persist(): true` / `storage.persisted(): true` — recorded, not "logged".
 - [x] `crossOriginIsolated: true` — COOP/COEP verified on-device; no tethered console needed.
-- [x] `innerHeight / visualViewport / 100dvh: 810 / 810 / 810`; `safe-area t r b l: 20px 0px 0px 0px`; no scroll bar or gap under the status bar observed.
+- [x] `innerHeight / visualViewport / 100dvh: 810 / 810 / 810`; `safe-area t r b l: 20px 0px 0px 0px`; no gap under the status bar.
+- [ ] `scrollHeight / innerHeight` are equal (no page scroll at rest) after the safe-area double-count fix.
 - [ ] Airplane mode on. Relaunch. Shell renders.
 - [ ] Panel reports `10` entries for `workbox-precache-v2-*` and `0` for `format-bridge` on first install. (Earlier panel build only printed cache names; re-check after the icon deploy.)
 - [ ] ~~Airplane mode off, poll 60 s: 4 files in `format-bridge`.~~ **Blocked by design — see Deviation 6.** Cannot pass until M15 ships the WASM binaries.
@@ -79,6 +80,7 @@ Device actually used: **iPadOS/Safari 18.3** per the panel UA (`Version/18.3`), 
 8. **`npm test` uses `node --test`, not vitest.** Two invariants guard the bugs found during M1: the diagnostics panel must inspect the same four converter URLs as the SW, and `public/404.html` must exist. `vitest@^1` is still installed per the deliverable but unused this milestone.
 9. **Icon is an amber play triangle, not the red cue dot.** Requested after first deploy. Accent variables moved to `#f2b544` / `#d99a2b` / `#0f0f0f` (dark text on amber), and the 404 link matches. Icons stay full-bleed squares so the OS applies its own mask.
 10. **Precache cache name.** The checklist and first panel reported `app-shell`, but `precacheAndRoute` stores under `workbox-precache-v2-<scope>`. The `app-shell` cache only fills when a navigation misses precache (e.g. `/?v=3`). Panel now prints entry counts for every cache, and the check is "10 entries in `workbox-precache-v2-*`".
+11. **Safe-area double count fixed.** `body` had `min-height: 100dvh` plus `padding-top: env(...)`, while `.app-shell` also claimed `100dvh`; border-box puts the inset inside the viewport height, so the document was taller by exactly the inset (20 px on iPad) and scrolled. Body is now the flex column; `.app-shell` uses `flex: 1`. Panel prints `scrollHeight / innerHeight` so this is measurable on-device instead of eyeballed.
 
 ## Explicit non-goals (untouched)
 
