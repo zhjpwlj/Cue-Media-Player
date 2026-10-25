@@ -33,6 +33,7 @@ class FakeMedia {
     this.duration = 100;
     this.error = null;
     this._src = '';
+    this.autoLoad = true;
   }
 
   addEventListener(type, fn) {
@@ -68,7 +69,7 @@ class FakeMedia {
 
   set src(value) {
     this._src = value;
-    queueMicrotask(() => this.emit('loadedmetadata'));
+    if (this.autoLoad) queueMicrotask(() => this.emit('loadedmetadata'));
   }
 
   get src() {
@@ -78,9 +79,17 @@ class FakeMedia {
 
 const created = [];
 const revoked = [];
+const elements = [];
+const events = [];
+let silentNext = false;
 globalThis.document = {
-  createElement: (tag) => new FakeMedia(tag),
-  dispatchEvent: () => {},
+  createElement: (tag) => {
+    const el = new FakeMedia(tag);
+    el.autoLoad = !silentNext;
+    elements.push(el);
+    return el;
+  },
+  dispatchEvent: (event) => events.push(event),
 };
 URL.createObjectURL = () => {
   const url = `blob:${created.length + 1}`;
@@ -90,10 +99,18 @@ URL.createObjectURL = () => {
 URL.revokeObjectURL = (url) => revoked.push(url);
 
 const track = (id, type) => ({ id, name: `${id}.${type === 'video' ? 'mp4' : 'mp3'}`, type });
+const trackChanges = () => events.filter((e) => e.type === 'track-changed');
 
-test('broker revokes every replaced blob URL and pauses across sessions', async () => {
+function resetBrokerTest() {
   created.length = 0;
   revoked.length = 0;
+  elements.length = 0;
+  events.length = 0;
+  silentNext = false;
+}
+
+test('broker revokes every replaced blob URL and pauses across sessions', async () => {
+  resetBrokerTest();
   const { default: PlayerBroker } = await import('../../src/core/player-broker.js');
   const broker = new PlayerBroker();
 
@@ -117,4 +134,90 @@ test('broker revokes every replaced blob URL and pauses across sessions', async 
   await broker.play('b');
   assert.equal(broker.getState('a'), 'paused');
   assert.equal(broker.getState('b'), 'playing');
+});
+
+test('a stale load cannot change the newer track', async () => {
+  resetBrokerTest();
+  const { default: PlayerBroker } = await import('../../src/core/player-broker.js');
+  const broker = new PlayerBroker();
+
+  // The video never finishes loading, so its promise is still pending.
+  silentNext = true;
+  const videoLoad = broker.loadTrack('a', track('old', 'video'), { name: 'old.mp4' });
+  silentNext = false;
+  const audioLoad = broker.loadTrack('a', track('new', 'audio'), { name: 'new.mp3' });
+  await audioLoad;
+
+  const video = elements.find((el) => el.tagName === 'VIDEO');
+  const audio = broker.getCurrentElement('a');
+  assert.equal(audio.tagName, 'AUDIO');
+
+  // The abandoned video errors after the audio is already loaded.
+  video.error = { code: 4 };
+  video.emit('error');
+
+  const staleResult = await videoLoad.catch((err) => err);
+  assert.equal(staleResult, null);
+  assert.equal(broker.getState('a'), 'paused');
+  assert.equal(broker.getCurrentElement('a'), audio);
+  assert.equal(audio.src, 'blob:2');
+  assert.deepEqual(revoked, ['blob:1']);
+  assert.deepEqual(trackChanges().map((e) => e.detail.track.name), ['new.mp3']);
+  assert.equal(events.filter((e) => e.type === 'playback-error').length, 0);
+});
+
+test('a failed load restores the previous track', async () => {
+  resetBrokerTest();
+  const { default: PlayerBroker } = await import('../../src/core/player-broker.js');
+  const broker = new PlayerBroker();
+
+  await broker.loadTrack('a', track('good', 'audio'), { name: 'good.mp3' });
+  const audio = broker.getCurrentElement('a');
+
+  const failed = broker.loadTrack('a', track('bad', 'audio'), { name: 'bad.mp3' });
+  audio.error = { code: 4 };
+  audio.emit('error');
+
+  await assert.rejects(failed, /failed to load/i);
+  assert.equal(broker.getState('a'), 'paused');
+  assert.equal(broker.getCurrentElement('a'), audio);
+  assert.equal(audio.src, 'blob:3');
+  assert.equal(trackChanges().at(-1).detail.track.name, 'good.mp3');
+});
+
+test('a stalled load times out instead of staying loading', async (t) => {
+  resetBrokerTest();
+  const { default: PlayerBroker } = await import('../../src/core/player-broker.js');
+  const broker = new PlayerBroker();
+
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  silentNext = true;
+  const loading = broker.loadTrack('a', track('slow', 'audio'), { name: 'slow.mp3' });
+  silentNext = false;
+
+  t.mock.timers.tick(60_000);
+  const result = await Promise.race([
+    loading.then(() => 'resolved', (err) => err.message),
+    new Promise((resolve) => setImmediate(() => resolve('still loading'))),
+  ]);
+  assert.match(result, /timed out/i);
+  assert.equal(broker.getState('a'), 'idle');
+  t.mock.timers.reset();
+});
+
+test('a media error pauses the session', async () => {
+  resetBrokerTest();
+  const { default: PlayerBroker } = await import('../../src/core/player-broker.js');
+  const broker = new PlayerBroker();
+
+  await broker.loadTrack('a', track('one', 'audio'), { name: 'one.mp3' });
+  await broker.play('a');
+  assert.equal(broker.getState('a'), 'playing');
+
+  const audio = broker.getCurrentElement('a');
+  audio.error = { code: 4 };
+  audio.emit('error');
+
+  assert.equal(broker.getState('a'), 'paused');
+  assert.equal(events.filter((e) => e.type === 'playback-error').length, 1);
 });

@@ -83,9 +83,13 @@ export default class VideosView {
         file,
       );
     } catch {
-      this.#stage.replaceChildren(this.#empty);
-      this.#status.textContent = 'No file open';
-      this.#time.textContent = '';
+      // The broker restores the last good track; only clear the stage when
+      // there is nothing left to show.
+      if (!this.#broker.getCurrentElement(SESSION_ID)) {
+        this.#stage.replaceChildren(this.#empty);
+        this.#status.textContent = 'No file open';
+        this.#time.textContent = '';
+      }
       this.#toasts.show(`Could not load ${file.name}.`);
     }
   }

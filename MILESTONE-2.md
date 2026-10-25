@@ -1,6 +1,6 @@
 # Milestone 2 — File Handling and Single-Track Native Playback
 
-Status: implemented, built, deployed. Awaiting device verification.
+Status: implemented, review fixes applied, built, deployed. Awaiting device verification.
 
 Scope: pick one local audio or video file, play it with the platform's native
 controls, show track name and elapsed/duration. No folder picker, playlist,
@@ -31,12 +31,12 @@ later milestones.
 
 - `src/main.js`: imports the four modules, creates instances, mounts the view
   immediately; SW boot/`boot-complete` is unchanged and independent.
-- `src/index.html`: links `components.css`; footer is `v0.2.0`.
-- `package.json`: version `0.2.0`.
+- `src/index.html`: links `components.css`; footer is `v0.2.1`.
+- `package.json`: version `0.2.1`.
 
 ### Tests
 
-`npm test` → 6/6 pass (`node --test`):
+`npm test` → 10/10 pass (`node --test`):
 
 1. Diagnostics inspects the same four converter URLs as the SW (M1).
 2. `public/404.html` exists (M1).
@@ -45,6 +45,10 @@ later milestones.
 5. `mediaKind` prefers MIME, falls back to case-insensitive extension (M2).
 6. Broker revokes each replaced blob URL exactly once and pauses across
    sessions (M2, fake DOM/media elements).
+7. A superseded load returns `null` and cannot revoke or reset the newer track.
+8. A failed load restores the last good track and leaves it paused.
+9. A load with no metadata or error rejects after 30 s and returns to idle.
+10. A media error pauses the session before dispatching `playback-error`.
 
 Build: `npm run build` exit 0, 11 modules, one CSS + one JS asset, Workbox
 precaches 10 URLs.
@@ -61,20 +65,23 @@ precaches 10 URLs.
    property of the audio element, set once, never toggled per track. As a
    result audio tracks never fire `ended`, so auto-advance has nothing to
    trigger until the playlist exists (M4).
-4. **Native-only classification.** `mediaKind` accepts MIME `audio/*` or
-   `video/*`, then a small extension allowlist (`mp3 m4a aac wav aif aiff flac
-   ogg oga opus` / `mp4 m4v mov webm`). Anything else gets an "unsupported"
-   toast. MIME is not trusted blindly: iOS may hand over
-   `application/octet-stream` for known extensions. FormatBridge (M13) replaces
-   this with real probing.
+4. **MIME-first classification, native decoding after.** `mediaKind` accepts
+   any MIME starting `audio/` or `video/`, then a small extension allowlist
+   (`mp3 m4a aac wav aif aiff flac ogg oga opus` / `mp4 m4v mov webm`).
+   Unknown MIME and unknown extensions get the "unsupported" toast. A known
+   container that Safari cannot decode (an AVI reported as `video/x-msvideo`,
+   for example) reaches the player and fails with "Could not load". Real
+   playability probing is FormatBridge's job (M13); M2 only promises the early
+   filter for unknown types.
 5. **iOS picker cancel is inferred.** Safari fires no event when the picker is
    dismissed, so the promise resolves empty one second after focus returns.
    Picking a file settles earlier via `change`; the timer then no-ops. Cancel
    is silent, by design.
-6. **One error report per failed load.** `loadTrack` rejects on the first
-   `error`/timeout path, and the element's own `error` listener ignores events
-   while the session is `loading`. Without that, a failed load produced two
-   toasts.
+6. **One error report per failed load, with a 30 s cap.** `onceLoaded` rejects
+   on `error` or after 30 s without metadata, so an iCloud placeholder or a
+   malformed container cannot leave the session in `loading`. The element's
+   own `error` listener ignores events while loading, so a failed load produces
+   one toast, from the view's catch.
 7. **Releasing a source never calls `load()` on an empty element.** The first
    draft did, which can raise `error` in Safari on a fresh element. `#release`
    now returns early when no blob URL exists for that slot.
@@ -86,30 +93,47 @@ precaches 10 URLs.
 9. **Session id is the literal `main`.** Multi-session tabs and persistence are
    M9. The broker's map already keys by session id, so M9 adds ids, not a
    rewrite.
-10. **Version bumped to 0.2.0.** The footer is the quickest on-device proof that
-    the new build is active after **Apply update**.
+10. **Version bumped to 0.2.0 for the first M2 build.** The footer is the
+    quickest on-device proof that the new build is active after **Apply update**.
 11. **No console output added.** Errors surface as toasts; boot-time console
     calls from M1 are unchanged.
 12. **`npm test` ESM warning.** Node prints "reparsing as ES module" for the
     M2 tests because `package.json` has no `"type": "module"` and the M1 tests
     use `require`. Harmless; the alternative is renaming the M1 test to `.cjs`,
     which buys nothing.
+13. **A newer load owns the session.** Each session keeps a `loadId`; a load
+    that is superseded returns `null` and may not touch state, URLs, or the
+    stage. Without this, a late `error` from an abandoned file could revoke the
+    track that replaced it. A released element's `error` listener also checks
+    that it is still the current element before it speaks for the session.
+14. **A failed load restores the last good track.** The broker keeps the last
+    successful `{track, file}`. On rejection it reloads that file, which
+    restores the previous source, name, and paused state. The failed pick still
+    produces its toast. The restored track starts at 0; position preservation
+    belongs to the playlist milestone.
+15. **`playback-error` is an addition to the §5 catalog.** The spec lists no
+    error event. M2 adds `playback-error` so a mid-playback decode failure can
+    reach the view without the broker importing UI code. Record it in the
+    catalog at the next spec edit.
+16. **Version is 0.2.1.** The review fixes changed the build; the version bump
+    makes **Apply update** easy to see on the device.
 
 ## Verification on device (installed PWA)
 
-- [ ] Footer reads `v0.2.0` after **Apply update** and reload.
+- [ ] Footer reads `v0.2.1` after **Apply update** and reload.
 - [ ] **Open file** opens the iOS document picker; choosing an `.mp3` shows
       native controls, the file name, and `0:00 / <duration>`.
-- [ ] Play, pause, scrub, and volume work through native controls.
+- [ ] Play, pause, and scrub work through native controls.
 - [ ] Track name replaces "No file open"; no toast on a successful load.
 - [ ] Cancelling the picker changes nothing and shows no error.
-- [ ] Choosing an unsupported file (e.g. `.mkv`, `.avi`) shows
-      "That file type is not supported yet." and leaves the previous track
-      untouched.
+- [ ] Choosing a non-media file (e.g. `.txt`, `.pdf`) shows "That file type is
+      not supported yet." and leaves the previous track untouched.
 - [ ] Choosing an `.mp4`/`.mov` plays inline in the stage (no fullscreen
       hijack, no separate player).
+- [ ] Choosing a corrupt but supported file (truncated `.mp3`/`.mp4`) shows
+      "Could not load …" and the previous track stays visible and paused.
 - [ ] While one track plays, choosing another stops the first, resets the time
-      line, and plays the new one.
+      line, and shows the new one paused (no autoplay).
 - [ ] Switching audio → video → audio keeps a single visible player.
 - [ ] An audio track loops at the end (native loop, §6.2 amendment).
 - [ ] Video reaching the end stops (it does not loop).

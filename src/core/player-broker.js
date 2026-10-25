@@ -6,6 +6,8 @@
  */
 const KIND_TO_ELEMENT = { audio: 'audioClean', video: 'video' };
 const ELEMENT_TO_KIND = { audioClean: 'audio', video: 'video' };
+// Sixteen-core iPad storage can stall on an iCloud placeholder; do not wait forever.
+const LOAD_TIMEOUT_MS = 30_000;
 
 export default class PlayerBroker {
   constructor() {
@@ -21,6 +23,7 @@ export default class PlayerBroker {
   async loadTrack(sessionId, track, file) {
     const rec = this.#record(sessionId);
     const kind = track.type === 'video' ? 'video' : 'audio';
+    const loadId = ++rec.loadId;
     this.#setState(sessionId, 'loading');
 
     // Step 3: every element not being loaded this round is released.
@@ -43,13 +46,29 @@ export default class PlayerBroker {
     try {
       await onceLoaded(element);
     } catch (err) {
+      // A newer load owns the element now; this one must not roll it back.
+      if (rec.loadId !== loadId) return null;
       this.#release(rec, kind, element);
       rec.currentType = null;
       rec.track = null;
       this.#setState(sessionId, 'idle');
+
+      const restore = rec.lastGood;
+      if (restore) {
+        rec.lastGood = null;
+        try {
+          const restored = await this.loadTrack(sessionId, restore.track, restore.file);
+          if (restored) rec.lastGood = restore;
+        } catch {
+          // The original failure is the one the caller reports.
+        }
+      }
       throw err;
     }
 
+    if (rec.loadId !== loadId) return null;
+
+    rec.lastGood = { track, file };
     this.#setState(sessionId, 'paused');
     dispatch('track-changed', { sessionId, track });
     return element;
@@ -89,7 +108,7 @@ export default class PlayerBroker {
   #record(sessionId) {
     let rec = this.sessions.get(sessionId);
     if (!rec) {
-      rec = { audioClean: null, video: null, urls: new Map(), container: null, currentType: null, track: null, state: 'idle' };
+      rec = { audioClean: null, video: null, urls: new Map(), container: null, currentType: null, track: null, state: 'idle', lastGood: null, loadId: 0 };
       this.sessions.set(sessionId, rec);
     }
     return rec;
@@ -122,13 +141,15 @@ export default class PlayerBroker {
 
   #bind(el, sessionId, kind) {
     el.addEventListener('loadedmetadata', () => {
+      if (this.#current(sessionId) !== el) return;
       dispatch('time-update', { sessionId, currentTime: el.currentTime, duration: el.duration });
     });
     el.addEventListener('timeupdate', () => {
+      if (this.#current(sessionId) !== el) return;
       dispatch('time-update', { sessionId, currentTime: el.currentTime, duration: el.duration });
     });
     el.addEventListener('play', () => {
-      this.#pauseOthers(sessionId, el);
+      this.#pauseOthers(el);
       this.#setState(sessionId, 'playing');
       dispatch('playback-started', { sessionId });
     });
@@ -146,19 +167,20 @@ export default class PlayerBroker {
     el.addEventListener('error', () => {
       // A load failure rejects loadTrack; report it once from there.
       if (this.getState(sessionId) === 'loading') return;
+      // A released element can still emit error; it must not speak for the session.
+      if (this.#current(sessionId) !== el) return;
+      this.#setState(sessionId, 'paused');
       const message = el.error?.code === 4 ? 'Format not supported' : 'Playback failed';
       dispatch('playback-error', { sessionId, message, kind });
     });
   }
 
-  #pauseOthers(sessionId, playingElement) {
-    for (const [id, rec] of this.sessions) {
+  #pauseOthers(playingElement) {
+    for (const rec of this.sessions.values()) {
       for (const name of Object.keys(ELEMENT_TO_KIND)) {
         const el = rec[name];
         if (el && el !== playingElement && !el.paused) el.pause();
       }
-      if (id === sessionId) continue;
-      // State is driven by each element's own pause event.
     }
   }
 
@@ -187,8 +209,9 @@ export default class PlayerBroker {
   }
 }
 
-function onceLoaded(el) {
+function onceLoaded(el, timeoutMs = LOAD_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
+    let timer;
     const ok = () => {
       cleanup();
       resolve();
@@ -198,11 +221,16 @@ function onceLoaded(el) {
       reject(new Error('Media element failed to load'));
     };
     const cleanup = () => {
+      clearTimeout(timer);
       el.removeEventListener('loadedmetadata', ok);
       el.removeEventListener('error', fail);
     };
     el.addEventListener('loadedmetadata', ok, { once: true });
     el.addEventListener('error', fail, { once: true });
+    timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Media metadata timed out'));
+    }, timeoutMs);
   });
 }
 
