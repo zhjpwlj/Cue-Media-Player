@@ -26,9 +26,9 @@ Legend: `[x]` verified locally from the built artifact · `[ ]` requires a devic
 - [x] Panel `storage.persist(): true` / `storage.persisted(): true` — recorded, not "logged".
 - [x] `crossOriginIsolated: true` — COOP/COEP verified on-device; no tethered console needed.
 - [x] `innerHeight / visualViewport / 100dvh: 810 / 810 / 810`; `safe-area t r b l: 20px 0px 0px 0px`; no gap under the status bar.
-- [ ] `scrollHeight / innerHeight` are equal (no page scroll at rest) after the safe-area double-count fix.
-- [ ] Airplane mode on. Relaunch. Shell renders.
-- [ ] Panel reports `10` entries for `workbox-precache-v2-*` and `0` for `format-bridge` on first install. (Earlier panel build only printed cache names; re-check after the icon deploy.)
+- [x] `scrollHeight / innerHeight: 810 / 810`; no page movement on drag after fixing the root. iOS rubber-band on the document is gone (`body` fixed, `.app-main` owns scrolling).
+- [x] Airplane mode on. Relaunch. Shell renders and works. iOS still shows "Turn Off Airplane Mode to Access Data" — that dialog comes from the browser's own `/sw.js` update probe, which a SW cannot serve or a page cancel. Cosmetic; offline behavior passes.
+- [ ] Panel reports `10` entries for `workbox-precache-v2-*` and `0` for `format-bridge` on first install. (Value not yet pasted after the icon deploy.)
 - [ ] ~~Airplane mode off, poll 60 s: 4 files in `format-bridge`.~~ **Blocked by design — see Deviation 6.** Cannot pass until M15 ships the WASM binaries.
 - [ ] Background → foreground: no new network requests to `/assets/wasm/*`. (Only meaningful after Deviation 6 clears.)
 
@@ -84,6 +84,7 @@ Device actually used: **iPadOS/Safari 18.3** per the panel UA (`Version/18.3`), 
 12. **Root rubber-band scroll.** With `810 / 810` the content already fit; the movement was iOS bouncing the root document. `html, body` now set `height: 100%; overflow: hidden`, `body` is `position: fixed; inset: 0`, and `.app-main` owns scrolling (`overflow-y: auto; overscroll-behavior: contain`). Views added later must scroll inside `.app-main`, not rely on document scroll.
 13. **Version label.** `v0.1.0` bottom-right, safe-area aware, `pointer-events: none`. A test pins it to `package.json`; bump both when the version changes.
 14. **Converter precache skips offline.** `triggerFormatBridgePrecache()` and its `visibilitychange` retry now return early when `!navigator.onLine`. Without this, the four failing WASM fetches offline raise iOS's "Turn Off Airplane Mode to Access Data" alert while the cached shell keeps working.
+15. **The airplane-mode dialog cannot be removed from app code.** Even with the offline guard, iOS raises the same dialog for the browser's periodic `/sw.js` update probe. Service worker scripts bypass the SW itself and are fetched by the browser, so neither the page nor the worker can intercept it. The app still renders and plays from cache; treat the dialog as expected platform noise, not a failure.
 
 ## Explicit non-goals (untouched)
 
