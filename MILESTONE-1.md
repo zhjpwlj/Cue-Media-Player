@@ -33,10 +33,10 @@ Legend: `[x]` verified locally from the built artifact · `[ ]` requires a devic
 
 ## Verification on macOS Safari 26.x
 
-- [ ] Deployed URL renders.
+- [x] Deployed URL renders. (curl 200, `<title>Cue</title>`)
 - [ ] Service worker active and controlling.
 - [ ] Cache Storage contains expected `app-shell` entries.
-- [ ] Response headers on `/`: `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`, `Cross-Origin-Resource-Policy: same-origin`.
+- [x] Response headers on `/`: `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`, `Cross-Origin-Resource-Policy: same-origin`. (curl-verified)
 - [ ] `typeof SharedArrayBuffer === 'function'`.
 
 ## SW update flow test
@@ -45,6 +45,15 @@ Legend: `[x]` verified locally from the built artifact · `[ ]` requires a devic
 - [ ] Deploy version B with changed bytes in a precached file.
 - [ ] Reload: `sw-update-available` fires; old app keeps working.
 - [ ] Update → `SKIP_WAITING` → `controllerchange` → reload → version B active.
+
+## Live deployment — https://cue-media-player.pages.dev (Cloudflare Pages, 2026-10-25)
+
+- `/` → 200, `text/html`, `<title>Cue</title>`; `cross-origin-opener-policy: same-origin`, `cross-origin-embedder-policy: require-corp`, `cross-origin-resource-policy: same-origin`, `cache-control: no-cache`.
+- `/sw.js` → 200 `application/javascript`, `cache-control: no-cache`; injected manifest now 10 URLs including `404.html`.
+- `/manifest.json` → 200 `application/json`, `cache-control: no-cache`.
+- Icons + `silent.mp3` → 200, correct content types, `cache-control: public, max-age=31536000, immutable`.
+- `/nope` → 404 with the custom page. `/_headers` → 404 (not served). `/assets/wasm/ffmpeg-audio.wasm` → 404 `text/html` 815 B, i.e. the SPA fallback is off and `precacheFormatBridge()` will now fail cleanly instead of caching HTML.
+- `access-control-allow-origin: *` is added by Pages itself; harmless because every resource is same-origin with `cross-origin-resource-policy: same-origin`.
 
 ## Local evidence (this machine)
 
