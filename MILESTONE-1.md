@@ -22,14 +22,14 @@ Legend: `[x]` verified locally from the built artifact · `[ ]` requires a devic
 ## Verification on real iOS 26.x device (installed PWA)
 
 - [ ] Launch installed PWA. No browser chrome.
-- [ ] `console.log(typeof SharedArrayBuffer)` from tethered Web Inspector returns `'function'`.
-- [ ] `navigator.storage.persist()` result recorded (actual value).
-- [ ] No Cross-Origin-Embedder-Policy warnings from sub-resources.
-- [ ] `100dvh` on body — no scroll bar, no gap under status bar, no overlap with home indicator.
+- [ ] Open the diagnostics panel (five quick taps on the `cue` header). `SharedArrayBuffer: function`.
+- [ ] Panel `storage.persist()` / `storage.persisted()` values recorded (actual values, not "logged").
+- [ ] No Cross-Origin-Embedder-Policy warnings. (Panel `crossOriginIsolated: true`; no tethered console available.)
+- [ ] `innerHeight / visualViewport / 100dvh` agree; `safe-area` insets non-zero on a notched device; no scroll bar, no gap under status bar, no home-indicator overlap.
 - [ ] Airplane mode on. Relaunch. Shell renders.
-- [ ] Cache Storage: `app-shell` populated; `format-bridge` empty on first install.
-- [ ] ~~Airplane mode off, poll 60 s: 4 files in `format-bridge`.~~ **Blocked by design — see Deviation 5.** Cannot pass until M15 ships the WASM binaries.
-- [ ] Background → foreground: no new network requests to `/assets/wasm/*`. (Only meaningful after Deviation 5 clears.)
+- [ ] Panel: `app-shell entries: 10`, `format-bridge entries: 0` on first install.
+- [ ] ~~Airplane mode off, poll 60 s: 4 files in `format-bridge`.~~ **Blocked by design — see Deviation 6.** Cannot pass until M15 ships the WASM binaries.
+- [ ] Background → foreground: no new network requests to `/assets/wasm/*`. (Only meaningful after Deviation 6 clears.)
 
 ## Verification on macOS Safari 26.x
 
@@ -43,8 +43,8 @@ Legend: `[x]` verified locally from the built artifact · `[ ]` requires a devic
 
 - [ ] Deploy version A, install, wait for format-bridge.
 - [ ] Deploy version B with changed bytes in a precached file.
-- [ ] Reload: `sw-update-available` fires; old app keeps working.
-- [ ] Update → `SKIP_WAITING` → `controllerchange` → reload → version B active.
+- [ ] Reopen the app; `sw.waiting: yes` in the diagnostics panel. Old app keeps working.
+- [ ] Tap **Apply update** in the panel (`SKIP_WAITING` → `controllerchange` → reload) → version B active.
 
 ## Live deployment — https://cue-media-player.pages.dev (Cloudflare Pages, 2026-10-25)
 
@@ -62,6 +62,8 @@ Legend: `[x]` verified locally from the built artifact · `[ ]` requires a devic
 - VM smoke test of built SW: `install/activate/fetch/message` listeners registered; `PRECACHE_FORMAT_BRIDGE` writes exactly 4 assets, leaves no `?pending` key, re-run hits cache 4×; `SKIP_WAITING` calls `self.skipWaiting()` inside `waitUntil`.
 - `vite preview` returns 200 for `/`, `/sw.js`, `/manifest.json`, `/_headers`, `silent.mp3`, `icon-192.png`; `/sw.js` served `Cache-Control: no-cache`.
 - No `console.log` in `src/`.
+- `npm test` → 2/2 pass (`node --test`): converter-URL drift guard, `public/404.html` presence guard.
+- `src/diagnostics.js` is bundled into the built JS and executes after DOM parse (module scripts are deferred).
 
 ## Deviations from spec
 
@@ -71,6 +73,8 @@ Legend: `[x]` verified locally from the built artifact · `[ ]` requires a devic
 4. `vite build` prints a Vite CJS-Node-API deprecation warning. Benign; caused by `workbox-config.js` requiring CJS, so `"type": "module"` cannot be set.
 5. **`public/404.html` added (deployment correctness).** Cloudflare Pages treats a project with no top-level `404.html` as an SPA and answers every unmatched path with `/` and status 200. Verified live: `/assets/wasm/ffmpeg-audio.wasm` returned 969 bytes of `text/html`. `precacheFormatBridge()` checks only `res.ok`, so it would have cached that HTML under the WASM key and, because it skips existing keys, never replaced it at M15. A top-level 404 makes Pages return a real 404 for missing files. Do not add `_redirects` SPA fallback for the same reason.
 6. **`format-bridge` cannot populate in Milestone 1.** The checklist asks to poll until the 4 WASM files appear, but `public/assets/wasm/*` are Milestone 15–16 deliverables and are intentionally absent. Stub binaries were rejected: `precacheFormatBridge()` skips keys that already exist, so a placeholder would be cached once and never replaced by the real module. The write path itself is verified in the VM test above (4 assets, no `?pending`, idempotent re-run). Until M15, each visibility change retries 4 fetches that 404 and logs `format-bridge precache failed` — no app-shell impact.
+7. **On-device diagnostics panel (`src/diagnostics.js`).** No tethered Mac, so the M1 values would otherwise be unreadable on iPad. Five quick taps on the header opens a panel printing `SharedArrayBuffer`, `crossOriginIsolated`, `persist()`/`persisted()`, storage estimate, SW controller/scope/state/waiting, cache entry counts, each converter asset's cached byte size and content-type, `innerHeight`/`visualViewport`/`100dvh`, safe-area insets, and UA. It also exposes an **Apply update** button that dispatches the same `sw-apply-update` event the future toast will use. Deviation: production code, ~200 lines, always loaded (a gesture gates it). Remove at M22 or keep as the permanent fallback.
+8. **`npm test` uses `node --test`, not vitest.** Two invariants guard the bugs found during M1: the diagnostics panel must inspect the same four converter URLs as the SW, and `public/404.html` must exist. `vitest@^1` is still installed per the deliverable but unused this milestone.
 
 ## Explicit non-goals (untouched)
 

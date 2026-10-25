@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && esbuild src/sw.js --bundle --format=iife --target=es2020 --outfile=.build/sw.js && workbox injectManifest workbox-config.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test tests/unit/*.test.js"
   },
   "dependencies": {
     "esbuild": "^0.21.5",
