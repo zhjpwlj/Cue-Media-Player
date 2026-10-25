@@ -1,8 +1,20 @@
 // src/main.js
+import PlayerBroker from './core/player-broker.js';
+import FileHandler from './core/file-handler.js';
+import Toasts from './ui/toasts.js';
+import VideosView from './views/videos-view.js';
+
 const bootPromise = boot();
 bootPromise.then(() => {
   document.dispatchEvent(new CustomEvent('boot-complete'));
 });
+
+// Views mount immediately; boot() runs independently (SW, storage, updates).
+new VideosView({
+  broker: new PlayerBroker(),
+  fileHandler: new FileHandler(),
+  toasts: new Toasts(),
+}).mount(document.querySelector('.app-main'));
 
 async function boot() {
   const reg = await registerServiceWorker();

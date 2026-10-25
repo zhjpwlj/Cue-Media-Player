@@ -1,0 +1,134 @@
+/* Milestone 2 view styles. Structural shell lives in base.css. */
+
+.videos-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 16px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.videos-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.videos-heading {
+  min-width: 0;
+}
+
+.videos-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.videos-subtitle {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.btn {
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  /* iOS: removes the 300ms tap delay without disabling zoom elsewhere. */
+  touch-action: manipulation;
+}
+
+.btn:active {
+  background: var(--bg-hover);
+}
+
+.btn-primary {
+  border-color: transparent;
+  background: var(--accent-primary);
+  color: var(--accent-text);
+}
+
+.btn-primary:active {
+  background: var(--accent-hover);
+}
+
+.player-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.player-stage video {
+  display: block;
+  width: 100%;
+  max-height: 60dvh;
+  border-radius: calc(var(--border-radius) - 4px);
+  background: #000;
+}
+
+.player-stage audio {
+  width: 100%;
+}
+
+.player-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.player-time {
+  margin: 0;
+  min-height: 1.4em;
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.toasts {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 32px);
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.toast {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  .videos-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
