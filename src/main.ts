@@ -1,22 +1,25 @@
-// src/main.js
-import PlayerBroker from './core/player-broker.js';
-import FileHandler from './core/file-handler.js';
-import Toasts from './ui/toasts.js';
-import VideosView from './views/videos-view.js';
+// src/main.ts
+// Boot sequence: register the SW, request persistent storage, kick off the
+// format-bridge precache (fire-and-forget), install the update listener.
+// Views mount immediately; boot() runs independently.
+
+import PlayerBroker from './core/player-broker';
+import FileHandler from './core/file-handler';
+import Toasts from './ui/toasts';
+import VideosView from './views/videos-view';
 
 const bootPromise = boot();
 bootPromise.then(() => {
   document.dispatchEvent(new CustomEvent('boot-complete'));
 });
 
-// Views mount immediately; boot() runs independently (SW, storage, updates).
 new VideosView({
   broker: new PlayerBroker(),
   fileHandler: new FileHandler(),
   toasts: new Toasts(),
-}).mount(document.querySelector('.app-main'));
+}).mount(document.querySelector<HTMLElement>('.app-main')!);
 
-async function boot() {
+async function boot(): Promise<void> {
   const reg = await registerServiceWorker();
   await requestPersistentStorage();
   if (reg) {
@@ -25,7 +28,7 @@ async function boot() {
   }
 }
 
-async function registerServiceWorker() {
+async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!('serviceWorker' in navigator)) return null;
   try {
     return await navigator.serviceWorker.register('/sw.js', { scope: '/' });
@@ -35,7 +38,7 @@ async function registerServiceWorker() {
   }
 }
 
-async function requestPersistentStorage() {
+async function requestPersistentStorage(): Promise<void> {
   if (!navigator.storage?.persist) return;
   try {
     const granted = await navigator.storage.persist();
@@ -48,7 +51,7 @@ async function requestPersistentStorage() {
 // Sends a PRECACHE_FORMAT_BRIDGE message to the active SW.
 // Returns once the message is sent — the actual download happens in the SW.
 // Page retries on visibilitychange → visible until all 4 files are cached.
-async function triggerFormatBridgePrecache(reg) {
+async function triggerFormatBridgePrecache(reg: ServiceWorkerRegistration): Promise<void> {
   // Offline, these fetches hard-fail and iOS raises "Turn Off Airplane Mode".
   if (!navigator.onLine) return;
   const ready = await navigator.serviceWorker.ready;
@@ -60,13 +63,13 @@ async function triggerFormatBridgePrecache(reg) {
     '/assets/wasm/ffmpeg-audio.worker.js',
     '/assets/wasm/ffmpeg-video.wasm',
     '/assets/wasm/ffmpeg-video.worker.js',
-  ];
+  ] as const;
 
   const cache = await caches.open('format-bridge');
   const present = await Promise.all(required.map((u) => cache.match(u)));
   if (present.every(Boolean)) return;
 
-  const trigger = () => active.postMessage({ type: 'PRECACHE_FORMAT_BRIDGE' });
+  const trigger = (): void => active.postMessage({ type: 'PRECACHE_FORMAT_BRIDGE' });
   trigger();
 
   document.addEventListener('visibilitychange', async () => {
@@ -79,8 +82,8 @@ async function triggerFormatBridgePrecache(reg) {
 }
 
 // Update flow: page shows a toast when a new SW is waiting; user confirms → SKIP_WAITING.
-function installUpdateListener(reg) {
-  const notify = () => {
+function installUpdateListener(reg: ServiceWorkerRegistration): void {
+  const notify = (): void => {
     if (reg.waiting) {
       document.dispatchEvent(new CustomEvent('sw-update-available'));
     }

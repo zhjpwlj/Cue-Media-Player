@@ -73,7 +73,7 @@ Device actually used: **iPadOS/Safari 18.3** per the panel UA (`Version/18.3`). 
 1. **SW bundling (required for a working milestone).** `workbox injectManifest` only injects the precache manifest — it does not bundle, and `nodeResolve` was not applied. The specified script left bare `import ... from 'workbox-precaching'` in `dist/sw.js`, which a classic service worker rejects at registration (`SyntaxError`). Fix: `esbuild src/sw.js --bundle --format=iife` into `.build/sw.js` before injection, and `swSrc: '.build/sw.js'`. `src/sw.js` is untouched. `esbuild@^0.21.5` added explicitly (already a Vite transitive dep). Revert if the handoff's tooling is corrected upstream.
 2. Icons are full-bleed squares, not pre-rounded: the OS applies its own mask (iOS squircle, Android maskable). Rounding inside the PNG double-rounds on both.
 3. `src/index.html` contains ~5 lines of static shell markup (`cue` header + empty main) so safe-area and `100dvh` are observable before Milestone 3.
-4. `vite build` prints a Vite CJS-Node-API deprecation warning. Benign; caused by `workbox-config.js` requiring CJS, so `"type": "module"` cannot be set.
+4. `vite build` printed a Vite CJS-Node-API deprecation warning while the repo was CommonJS. Resolved by the TypeScript rebuild: `package.json` is now `"type": "module"` and the Workbox config is `workbox-config.cjs` (workbox-cli loads it with `require`).
 5. **`public/404.html` added (deployment correctness).** Cloudflare Pages treats a project with no top-level `404.html` as an SPA and answers every unmatched path with `/` and status 200. Verified live: `/assets/wasm/ffmpeg-audio.wasm` returned 969 bytes of `text/html`. `precacheFormatBridge()` checks only `res.ok`, so it would have cached that HTML under the WASM key and, because it skips existing keys, never replaced it at M15. A top-level 404 makes Pages return a real 404 for missing files. Do not add `_redirects` SPA fallback for the same reason.
 6. **`format-bridge` cannot populate in Milestone 1.** The checklist asks to poll until the 4 WASM files appear, but `public/assets/wasm/*` are Milestone 15–16 deliverables and are intentionally absent. Stub binaries were rejected: `precacheFormatBridge()` skips keys that already exist, so a placeholder would be cached once and never replaced by the real module. The write path itself is verified in the VM test above (4 assets, no `?pending`, idempotent re-run). Until M15, each visibility change retries 4 fetches that 404 and logs `format-bridge precache failed` — no app-shell impact.
 7. **On-device diagnostics panel (`src/diagnostics.js`).** No tethered Mac, so the M1 values would otherwise be unreadable on iPad. Open with five quick taps or a ~0.9 s long press on the `cue` header (long press is immune to iOS double-tap zoom, which swallowed the first tap-only trigger; the header also gets `touch-action: manipulation`). Panel prints build filename, `SharedArrayBuffer`, `crossOriginIsolated`, `persist()`/`persisted()`, storage estimate, SW controller/scope/state/waiting, cache entry counts, each converter asset's cached byte size and content-type, `innerHeight`/`visualViewport`/`100dvh`, safe-area insets, and UA. It also exposes an **Apply update** button that dispatches the same `sw-apply-update` event the future toast will use. Deviation: production code, ~210 lines, always loaded (a gesture gates it). Remove at M22 or keep as the permanent fallback.
@@ -90,3 +90,34 @@ Device actually used: **iPadOS/Safari 18.3** per the panel UA (`Version/18.3`). 
 ## Explicit non-goals (untouched)
 
 Views, session manager, player broker, media elements, theme picker, theme swap logic, FFmpeg, mediabunny, `classify()`, `scripts/lint-themes.mjs`.
+
+## TypeScript rebuild (M1-TS)
+
+The milestone was first shipped in vanilla JS and device-verified. This section records the rebuild in TypeScript, applied on top of the working code instead of from an empty tree: every fix above is retained, and the only new surface is the TS toolchain and typed sources.
+
+### Toolchain
+
+- `tsconfig.json` as specified: `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`, `isolatedModules`, `lib` DOM + WebWorker, `types: []`, `noEmit`.
+- `package.json` is `"type": "module"`, version `0.3.0`. Scripts: `typecheck`, `build:sw`, `build` (`tsc --noEmit && vite build && build:sw && workbox injectManifest`).
+- `scripts/build-sw.mjs` compiles `src/sw.ts` with esbuild before Workbox injection.
+- `vite.config.ts` replaces `vite.config.js`; values unchanged (`root: 'src'`, `publicDir: '../public'`).
+- `src/**` is `.ts`; module boundaries are typed (`src/types/platform.ts`, broker `Track`/`PlayerState`, event detail types in the view).
+- Tests run on Node 22's built-in type stripping and import the `.ts` sources directly.
+
+### Deviations for this rebuild
+
+1. **Migration, not a from-scratch rewrite.** All M1/M2 fixes (404, safe-area, fixed root, offline guard, diagnostics, superseded-load guard) already worked and were device-verified; deleting them to retype the same lines would add risk with no benefit. Same public behavior, typed sources.
+2. **`workbox-config.cjs`, not `.js`.** With `"type": "module"`, workbox-cli's `require()` of the config file fails on a `.js` file. `.cjs` keeps the documented CommonJS config working.
+3. **`swSrc: '.build/sw.js'`.** The spec's `swSrc: 'dist/sw.js'` + `swDest: 'dist/sw.js'` is rejected by Workbox (source and destination must differ). esbuild writes `.build/sw.js`; Workbox injects and writes `dist/sw.js`.
+4. **esbuild `format: 'iife'`, not `'esm'`.** The SW registers as a classic worker (`navigator.serviceWorker.register('/sw.js')` with no `type: 'module'`). An ESM bundle would fail to parse at registration. Bundling also keeps workbox imports inside the file, which injectManifest does not resolve.
+5. **`public/404.html`, `public/_headers` warning order, amber icons, and the diagnostics panel are retained.** The spec's file plan omits them; the 404 is required on Pages (deviation 5 above), and the panel is the only on-device console available.
+6. **`navigator.userAgent` still appears once in `src/diagnostics.ts`.** The acceptance grep targets app code; the panel prints UA for device reports. `src/main.ts` and all app modules are clean.
+7. **`RangeRequestsPlugin` type cast.** `exactOptionalPropertyTypes` rejects workbox-range-requests' optional callbacks; the runtime object is valid, so the plugin array is cast once at that boundary in `src/sw.ts`.
+8. **Apple touch icon kept in `manifest.json`.** The spec lists three icons; the fourth 180×180 entry was already shipped and iOS uses it.
+
+### Local verification
+
+- `npm run typecheck` — pass.
+- `npm test` — 11/11 pass (the 10 previous tests plus a `100vh`/`userAgent` source guard).
+- `npm run build` — pass; 10 precache URLs, `dist/sw.js` is IIFE with no bare imports and no `self.__WB_MANIFEST`.
+- `grep -rn "100vh" src/` — 0 hits.

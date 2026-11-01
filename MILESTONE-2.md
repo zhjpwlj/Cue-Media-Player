@@ -1,6 +1,6 @@
 # Milestone 2 — File Handling and Single-Track Native Playback
 
-Status: implemented, review fixes applied, built, deployed. Awaiting device verification.
+Status: implemented, review fixes applied, rebuilt in TypeScript, built and deployed. Awaiting device verification.
 
 Scope: pick one local audio or video file, play it with the platform's native
 controls, show track name and elapsed/duration. No folder picker, playlist,
@@ -97,10 +97,7 @@ precaches 10 URLs.
     quickest on-device proof that the new build is active after **Apply update**.
 11. **No console output added.** Errors surface as toasts; boot-time console
     calls from M1 are unchanged.
-12. **`npm test` ESM warning.** Node prints "reparsing as ES module" for the
-    M2 tests because `package.json` has no `"type": "module"` and the M1 tests
-    use `require`. Harmless; the alternative is renaming the M1 test to `.cjs`,
-    which buys nothing.
+12. **ESM sources (superseded by the TypeScript rebuild).** The modules were originally `.js` with JSDoc types under a CommonJS `package.json`. They are now `.ts` modules in an ESM package; tests import the `.ts` sources through Node 22's type stripping. No runtime behavior changed.
 13. **A newer load owns the session.** Each session keeps a `loadId`; a load
     that is superseded returns `null` and may not touch state, URLs, or the
     stage. Without this, a late `error` from an abandoned file could revoke the
@@ -115,12 +112,12 @@ precaches 10 URLs.
     error event. M2 adds `playback-error` so a mid-playback decode failure can
     reach the view without the broker importing UI code. Record it in the
     catalog at the next spec edit.
-16. **Version is 0.2.1.** The review fixes changed the build; the version bump
-    makes **Apply update** easy to see on the device.
+16. **Version is 0.3.0.** The TypeScript rebuild and the review fixes changed
+    the build; the version bump makes **Apply update** easy to see on the device.
 
 ## Verification on device (installed PWA)
 
-- [ ] Footer reads `v0.2.1` after **Apply update** and reload.
+- [ ] Footer reads `v0.3.0` after **Apply update** and reload.
 - [ ] **Open file** opens the iOS document picker; choosing an `.mp3` shows
       native controls, the file name, and `0:00 / <duration>`.
 - [ ] Play, pause, and scrub work through native controls.

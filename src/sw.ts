@@ -1,8 +1,23 @@
+// src/sw.ts
+// Service Worker — TypeScript source. Compiled to .build/sw.js by esbuild,
+// then Workbox's injectManifest replaces `self.__WB_MANIFEST` with the
+// build manifest and writes dist/sw.js.
+
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
 import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { RangeRequestsPlugin } from 'workbox-range-requests';
 import { clientsClaim } from 'workbox-core';
+
+// exactOptionalPropertyTypes rejects workbox-range-requests' optional plugin
+// callbacks even though the runtime object is valid. Cast at this one boundary.
+const mediaPlugins = [new RangeRequestsPlugin()] as unknown as NonNullable<
+  NonNullable<ConstructorParameters<typeof CacheFirst>[0]>['plugins']
+>;
+
+declare let self: ServiceWorkerGlobalScope & {
+  __WB_MANIFEST: Array<{ url: string; revision: string | null }>;
+};
 
 // Take control immediately on first install (no old SW to displace).
 // Updates are NOT auto-applied: the page shows an update-available toast
@@ -14,10 +29,10 @@ cleanupOutdatedCaches();
 // Install fails if any of these fail to cache — that is intentional.
 precacheAndRoute(self.__WB_MANIFEST);
 
-const formatBridgeInFlight = new Set();
+const formatBridgeInFlight = new Set<string>();
 
 // Orphaned ?pending sweep on activate — survives SW death between writes.
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', (event: ExtendableEvent) => {
   event.waitUntil((async () => {
     const cache = await caches.open('format-bridge');
     for (const req of await cache.keys()) {
@@ -26,24 +41,24 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
-self.addEventListener('message', (event) => {
+self.addEventListener('message', (event: ExtendableMessageEvent) => {
   if (event.data?.type === 'SKIP_WAITING') {
     event.waitUntil(self.skipWaiting());
     return;
   }
   if (event.data?.type === 'PRECACHE_FORMAT_BRIDGE') {
-    event.waitUntil(precacheFormatBridge(event.source));
+    event.waitUntil(precacheFormatBridge((event.source as Client | null) ?? null));
   }
 });
 
-async function precacheFormatBridge(client) {
+async function precacheFormatBridge(client: Client | null): Promise<void> {
   const cache = await caches.open('format-bridge');
   const assets = [
     '/assets/wasm/ffmpeg-audio.wasm',
     '/assets/wasm/ffmpeg-audio.worker.js',
     '/assets/wasm/ffmpeg-video.wasm',
     '/assets/wasm/ffmpeg-video.worker.js',
-  ];
+  ] as const;
   for (const url of assets) {
     if (await cache.match(url)) {
       client?.postMessage({ type: 'FORMAT_BRIDGE_PROGRESS', url, done: true });
@@ -83,12 +98,12 @@ async function precacheFormatBridge(client) {
 
 registerRoute(
   ({ url }) => url.pathname.startsWith('/assets/themes/'),
-  new StaleWhileRevalidate({ cacheName: 'themes' })
+  new StaleWhileRevalidate({ cacheName: 'themes' }),
 );
 
 registerRoute(
   ({ url }) => url.pathname.startsWith('/assets/skins/'),
-  new StaleWhileRevalidate({ cacheName: 'themes' })
+  new StaleWhileRevalidate({ cacheName: 'themes' }),
 );
 
 // FUTURE-PROOFING — currently unused in this version. See spec §2.5 and §6.12.
@@ -106,16 +121,16 @@ registerRoute(
     /\.(mp4|webm|mp3|m4a|ogg|wav|flac|avi|mkv|mov)$/i.test(url.pathname),
   new CacheFirst({
     cacheName: 'media-cache',
-    plugins: [new RangeRequestsPlugin()],
-  })
+    plugins: mediaPlugins,
+  }),
 );
 
 registerRoute(
   ({ url }) => url.pathname.startsWith('/assets/wasm/'),
-  new CacheFirst({ cacheName: 'format-bridge' })
+  new CacheFirst({ cacheName: 'format-bridge' }),
 );
 
 registerRoute(
   ({ request }) => request.mode === 'navigate',
-  new CacheFirst({ cacheName: 'app-shell' })
+  new CacheFirst({ cacheName: 'app-shell' }),
 );

@@ -1,10 +1,10 @@
 // Milestone 2 units: time formatting, native media classification, and the
 // broker's blob-URL revocation invariant. Run with: npm test
-const test = require('node:test');
-const assert = require('node:assert');
+import test from 'node:test';
+import assert from 'node:assert';
 
 test('formatTime handles minutes, hours and junk', async () => {
-  const { formatTime } = await import('../../src/utils/time.js');
+  const { formatTime } = await import('../../src/utils/time.ts');
   assert.equal(formatTime(0), '0:00');
   assert.equal(formatTime(5), '0:05');
   assert.equal(formatTime(65), '1:05');
@@ -16,7 +16,7 @@ test('formatTime handles minutes, hours and junk', async () => {
 });
 
 test('mediaKind trusts MIME type, then falls back to extension', async () => {
-  const { mediaKind } = await import('../../src/core/file-handler.js');
+  const { mediaKind } = await import('../../src/core/file-handler.ts');
   assert.equal(mediaKind({ type: 'audio/mpeg', name: 'x.mp3' }), 'audio');
   assert.equal(mediaKind({ type: 'video/mp4', name: 'x.mp4' }), 'video');
   assert.equal(mediaKind({ type: '', name: 'X.FLAC' }), 'audio');
@@ -111,7 +111,7 @@ function resetBrokerTest() {
 
 test('broker revokes every replaced blob URL and pauses across sessions', async () => {
   resetBrokerTest();
-  const { default: PlayerBroker } = await import('../../src/core/player-broker.js');
+  const { default: PlayerBroker } = await import('../../src/core/player-broker.ts');
   const broker = new PlayerBroker();
 
   await broker.loadTrack('a', track('one', 'audio'), { name: 'one.mp3' });
@@ -138,7 +138,7 @@ test('broker revokes every replaced blob URL and pauses across sessions', async 
 
 test('a stale load cannot change the newer track', async () => {
   resetBrokerTest();
-  const { default: PlayerBroker } = await import('../../src/core/player-broker.js');
+  const { default: PlayerBroker } = await import('../../src/core/player-broker.ts');
   const broker = new PlayerBroker();
 
   // The video never finishes loading, so its promise is still pending.
@@ -168,7 +168,7 @@ test('a stale load cannot change the newer track', async () => {
 
 test('a failed load restores the previous track', async () => {
   resetBrokerTest();
-  const { default: PlayerBroker } = await import('../../src/core/player-broker.js');
+  const { default: PlayerBroker } = await import('../../src/core/player-broker.ts');
   const broker = new PlayerBroker();
 
   await broker.loadTrack('a', track('good', 'audio'), { name: 'good.mp3' });
@@ -187,7 +187,7 @@ test('a failed load restores the previous track', async () => {
 
 test('a stalled load times out instead of staying loading', async (t) => {
   resetBrokerTest();
-  const { default: PlayerBroker } = await import('../../src/core/player-broker.js');
+  const { default: PlayerBroker } = await import('../../src/core/player-broker.ts');
   const broker = new PlayerBroker();
 
   t.mock.timers.enable({ apis: ['setTimeout'] });
@@ -207,7 +207,7 @@ test('a stalled load times out instead of staying loading', async (t) => {
 
 test('a media error pauses the session', async () => {
   resetBrokerTest();
-  const { default: PlayerBroker } = await import('../../src/core/player-broker.js');
+  const { default: PlayerBroker } = await import('../../src/core/player-broker.ts');
   const broker = new PlayerBroker();
 
   await broker.loadTrack('a', track('one', 'audio'), { name: 'one.mp3' });

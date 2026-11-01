@@ -1,28 +1,51 @@
-import { mediaKind } from '../core/file-handler.js';
-import { formatTime } from '../utils/time.js';
+import { mediaKind } from '../core/file-handler';
+import type FileHandler from '../core/file-handler';
+import type PlayerBroker from '../core/player-broker';
+import type Toasts from '../ui/toasts';
+import { formatTime } from '../utils/time';
 
 // Milestone 2 is single-session. Session tabs arrive at M9.
-const SESSION_ID = 'main';
+export const SESSION_ID = 'main';
+
+interface VideosViewDeps {
+  broker: PlayerBroker;
+  fileHandler: FileHandler;
+  toasts: Toasts;
+}
+
+interface TrackChangedDetail {
+  sessionId: string;
+  track: { name: string };
+}
+interface TimeUpdateDetail {
+  sessionId: string;
+  currentTime: number;
+  duration: number;
+}
+interface PlaybackErrorDetail {
+  sessionId: string;
+  message: string;
+}
 
 /**
  * Single-track view: pick a file, hand it to the broker, show native controls.
  */
 export default class VideosView {
-  #broker;
-  #fileHandler;
-  #toasts;
-  #stage;
-  #status;
-  #time;
-  #empty;
+  #broker: PlayerBroker;
+  #fileHandler: FileHandler;
+  #toasts: Toasts;
+  #stage!: HTMLElement;
+  #status!: HTMLElement;
+  #time!: HTMLElement;
+  #empty!: HTMLElement;
 
-  constructor({ broker, fileHandler, toasts }) {
+  constructor({ broker, fileHandler, toasts }: VideosViewDeps) {
     this.#broker = broker;
     this.#fileHandler = fileHandler;
     this.#toasts = toasts;
   }
 
-  mount(container) {
+  mount(container: HTMLElement): void {
     container.innerHTML = `
       <section class="videos-view">
         <div class="videos-toolbar">
@@ -38,33 +61,40 @@ export default class VideosView {
         <p class="player-time" data-role="time"></p>
       </section>`;
 
-    const $ = (role) => container.querySelector(`[data-role="${role}"]`);
-    const openButton = $('open');
-    this.#stage = $('stage');
-    this.#status = $('status');
-    this.#time = $('time');
-    this.#empty = $('empty');
+    const el = (role: string): HTMLElement => {
+      const node = container.querySelector(`[data-role="${role}"]`);
+      if (!node) throw new Error(`missing [data-role="${role}"]`);
+      return node as HTMLElement;
+    };
+    const openButton = el('open');
+    this.#stage = el('stage');
+    this.#status = el('status');
+    this.#time = el('time');
+    this.#empty = el('empty');
 
-    openButton.addEventListener('click', () => this.#open());
+    openButton.addEventListener('click', () => void this.#open());
     this.#broker.attachTo(SESSION_ID, this.#stage);
 
     document.addEventListener('track-changed', (e) => {
-      if (e.detail.sessionId !== SESSION_ID) return;
-      this.#status.textContent = e.detail.track.name;
+      const detail = (e as CustomEvent<TrackChangedDetail>).detail;
+      if (detail.sessionId !== SESSION_ID) return;
+      this.#status.textContent = detail.track.name;
     });
 
     document.addEventListener('time-update', (e) => {
-      if (e.detail.sessionId !== SESSION_ID) return;
-      this.#time.textContent = `${formatTime(e.detail.currentTime)} / ${formatTime(e.detail.duration)}`;
+      const detail = (e as CustomEvent<TimeUpdateDetail>).detail;
+      if (detail.sessionId !== SESSION_ID) return;
+      this.#time.textContent = `${formatTime(detail.currentTime)} / ${formatTime(detail.duration)}`;
     });
 
     document.addEventListener('playback-error', (e) => {
-      if (e.detail.sessionId !== SESSION_ID) return;
-      this.#toasts.show(e.detail.message);
+      const detail = (e as CustomEvent<PlaybackErrorDetail>).detail;
+      if (detail.sessionId !== SESSION_ID) return;
+      this.#toasts.show(detail.message);
     });
   }
 
-  async #open() {
+  async #open(): Promise<void> {
     const files = await this.#fileHandler.openFilePicker();
     if (files.length === 0) return;
 
@@ -75,6 +105,7 @@ export default class VideosView {
     }
 
     const type = mediaKind(file);
+    if (!type) return;
     this.#status.textContent = `Loading ${file.name}…`;
     try {
       await this.#broker.loadTrack(

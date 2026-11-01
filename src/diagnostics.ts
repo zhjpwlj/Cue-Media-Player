@@ -1,6 +1,12 @@
 // On-device diagnostics for devices with no tethered console (iPad).
-// Open with five quick taps on the app header. Remove at M22 if the harness
-// gains a real inspector; nothing here runs unless the panel is opened.
+// Open with five quick taps or a long press on the app header. Remove at M22
+// if the harness gains a real inspector; nothing here runs until opened.
+
+declare global {
+  interface Navigator {
+    standalone?: boolean;
+  }
+}
 
 const TAP_COUNT = 5;
 const TAP_WINDOW_MS = 1500;
@@ -12,8 +18,10 @@ const WASM_URLS = [
   '/assets/wasm/ffmpeg-video.worker.js',
 ];
 
-let tapTimes = [];
-let holdTimer = null;
+type Add = (key: string, value: string) => void;
+
+let tapTimes: number[] = [];
+let holdTimer: ReturnType<typeof setTimeout> | null = null;
 let booted = false;
 document.addEventListener('boot-complete', () => {
   booted = true;
@@ -24,7 +32,7 @@ document.addEventListener('boot-complete', () => {
 const header = document.getElementById('app-header');
 header?.addEventListener('pointerdown', (e) => {
   // Session tabs and buttons land in this header at M9; never hijack them.
-  if (e.target.closest('button, a, input, select, textarea, [role="tab"]')) return;
+  if ((e.target as Element).closest('button, a, input, select, textarea, [role="tab"]')) return;
   const now = Date.now();
   tapTimes = tapTimes.filter((t) => now - t < TAP_WINDOW_MS);
   tapTimes.push(now);
@@ -44,12 +52,12 @@ header?.addEventListener('pointerup', cancelHold);
 header?.addEventListener('pointercancel', cancelHold);
 header?.addEventListener('pointerleave', cancelHold);
 
-function cancelHold() {
-  clearTimeout(holdTimer);
+function cancelHold(): void {
+  if (holdTimer !== null) clearTimeout(holdTimer);
   holdTimer = null;
 }
 
-function togglePanel() {
+function togglePanel(): void {
   const existing = document.getElementById('diagnostics');
   if (existing) {
     existing.remove();
@@ -79,7 +87,7 @@ function togglePanel() {
   pre.style.cssText = 'white-space:pre-wrap;word-break:break-word;margin:0';
   pre.textContent = 'gathering…';
 
-  const closePanel = () => {
+  const closePanel = (): void => {
     root.remove();
     document.removeEventListener('keydown', onKey);
   };
@@ -87,20 +95,20 @@ function togglePanel() {
   const close = makeButton('Close', closePanel);
   const copy = makeButton('Copy', async () => {
     try {
-      await navigator.clipboard.writeText(pre.textContent);
+      await navigator.clipboard.writeText(pre.textContent ?? '');
       copy.textContent = 'Copied';
     } catch {
       copy.textContent = 'Copy failed';
     }
   });
 
-  const onKey = (e) => {
+  const onKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape') closePanel();
   };
   document.addEventListener('keydown', onKey);
 
   bar.append(title, copy, close);
-  addUpdateButton(bar);
+  void addUpdateButton(bar);
   root.append(bar, pre);
   document.body.append(root);
   close.focus();
@@ -110,7 +118,7 @@ function togglePanel() {
   });
 }
 
-function makeButton(label, onClick) {
+function makeButton(label: string, onClick: () => void): HTMLButtonElement {
   const b = document.createElement('button');
   b.type = 'button';
   b.textContent = label;
@@ -120,8 +128,8 @@ function makeButton(label, onClick) {
 }
 
 // M1 has no update toast yet, so expose the same path the toast will use.
-// Reuses main.js's sw-apply-update handler instead of duplicating SKIP_WAITING.
-async function addUpdateButton(bar) {
+// Reuses main.ts's sw-apply-update handler instead of duplicating SKIP_WAITING.
+async function addUpdateButton(bar: HTMLElement): Promise<void> {
   if (!('serviceWorker' in navigator)) return;
   const reg = await navigator.serviceWorker.getRegistration();
   if (!reg?.waiting) return;
@@ -130,13 +138,17 @@ async function addUpdateButton(bar) {
   }));
 }
 
-async function snapshot() {
-  const lines = [];
-  const add = (key, value) => lines.push(`${key}: ${value}`);
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+async function snapshot(): Promise<string[]> {
+  const lines: string[] = [];
+  const add: Add = (key, value) => lines.push(`${key}: ${value}`);
 
   add('url', location.href);
-  add('build', [...document.scripts].map((s) => s.src.split('/').pop()).join(', ') || 'inline');
-  add('standalone', matchMedia('(display-mode: standalone)').matches);
+  add('build', [...document.scripts].map((s) => s.src.split('/').pop() ?? '').join(', ') || 'inline');
+  add('standalone', String(matchMedia('(display-mode: standalone)').matches));
   add('navigator.standalone', String(navigator.standalone));
   add('SharedArrayBuffer', typeof SharedArrayBuffer);
   add('crossOriginIsolated', String(globalThis.crossOriginIsolated));
@@ -159,7 +171,7 @@ async function snapshot() {
   return lines;
 }
 
-function safeAreaInsets() {
+function safeAreaInsets(): string {
   const probe = document.createElement('div');
   probe.style.cssText = 'position:fixed;visibility:hidden;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
   document.body.append(probe);
@@ -169,7 +181,7 @@ function safeAreaInsets() {
   return out;
 }
 
-async function addStorage(add) {
+async function addStorage(add: Add): Promise<void> {
   if (!navigator.storage?.persist) {
     add('storage.persist()', 'unsupported');
     return;
@@ -177,24 +189,24 @@ async function addStorage(add) {
   try {
     add('storage.persist()', String(await navigator.storage.persist()));
   } catch (err) {
-    add('storage.persist()', `error: ${err.message}`);
+    add('storage.persist()', `error: ${errorMessage(err)}`);
   }
   try {
     add('storage.persisted()', String(await navigator.storage.persisted()));
   } catch (err) {
-    add('storage.persisted()', `error: ${err.message}`);
+    add('storage.persisted()', `error: ${errorMessage(err)}`);
   }
   if (navigator.storage.estimate) {
     try {
       const { usage, quota } = await navigator.storage.estimate();
-      add('storage.usage / quota MB', `${Math.round(usage / 1e6)} / ${Math.round(quota / 1e6)}`);
+      add('storage.usage / quota MB', `${Math.round((usage ?? 0) / 1e6)} / ${Math.round((quota ?? 0) / 1e6)}`);
     } catch (err) {
-      add('storage.estimate()', `error: ${err.message}`);
+      add('storage.estimate()', `error: ${errorMessage(err)}`);
     }
   }
 }
 
-async function addServiceWorker(add) {
+async function addServiceWorker(add: Add): Promise<void> {
   if (!('serviceWorker' in navigator)) {
     add('serviceWorker', 'unsupported');
     return;
@@ -206,13 +218,13 @@ async function addServiceWorker(add) {
     add('sw.active', reg?.active?.state ?? 'none');
     add('sw.waiting', reg?.waiting ? 'yes' : 'no');
   } catch (err) {
-    add('sw.registration', `error: ${err.message}`);
+    add('sw.registration', `error: ${errorMessage(err)}`);
   }
 }
 
 // A wrong content-type here means a host fallback served HTML as a converter
 // binary; that entry would never be replaced, because the SW skips cached keys.
-async function addCaches(add) {
+async function addCaches(add: Add): Promise<void> {
   if (!globalThis.caches) {
     add('caches', 'unsupported');
     return;
@@ -248,3 +260,5 @@ async function addCaches(add) {
     }
   }
 }
+
+export {};

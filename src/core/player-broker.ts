@@ -4,30 +4,54 @@
  *
  * Invariant: every src-clear is followed by revoking the previous blob URL.
  */
-const KIND_TO_ELEMENT = { audio: 'audioClean', video: 'video' };
-const ELEMENT_TO_KIND = { audioClean: 'audio', video: 'video' };
+export type TrackKind = 'audio' | 'video';
+
+export interface Track {
+  id: string;
+  name: string;
+  type: TrackKind;
+}
+
+export type PlayerState = 'idle' | 'loading' | 'playing' | 'paused' | 'ended';
+
+interface SessionRecord {
+  audioClean: HTMLMediaElement | null;
+  video: HTMLMediaElement | null;
+  urls: Map<TrackKind, string>;
+  container: HTMLElement | null;
+  currentType: TrackKind | null;
+  track: Track | null;
+  state: PlayerState;
+  lastGood: { track: Track; file: Blob } | null;
+  loadId: number;
+}
+
+const KIND_TO_ELEMENT = { audio: 'audioClean', video: 'video' } as const;
+type ElementName = (typeof KIND_TO_ELEMENT)[TrackKind];
+const ELEMENT_NAMES: readonly ElementName[] = ['audioClean', 'video'];
+const ELEMENT_TO_KIND: Record<ElementName, TrackKind> = {
+  audioClean: 'audio',
+  video: 'video',
+};
 // Sixteen-core iPad storage can stall on an iCloud placeholder; do not wait forever.
 const LOAD_TIMEOUT_MS = 30_000;
 
 export default class PlayerBroker {
-  constructor() {
-    /** @type {Map<string, object>} */
-    this.sessions = new Map();
-  }
+  #sessions = new Map<string, SessionRecord>();
 
-  /**
-   * @param {string} sessionId
-   * @param {{id:string,name:string,type:'audio'|'video'}} track
-   * @param {File} file
-   */
-  async loadTrack(sessionId, track, file) {
+  async loadTrack(
+    sessionId: string,
+    track: Track,
+    file: Blob,
+  ): Promise<HTMLMediaElement | null> {
     const rec = this.#record(sessionId);
-    const kind = track.type === 'video' ? 'video' : 'audio';
+    const kind: TrackKind = track.type === 'video' ? 'video' : 'audio';
     const loadId = ++rec.loadId;
     this.#setState(sessionId, 'loading');
 
     // Step 3: every element not being loaded this round is released.
-    for (const [elementName, otherKind] of Object.entries(ELEMENT_TO_KIND)) {
+    for (const elementName of ELEMENT_NAMES) {
+      const otherKind = ELEMENT_TO_KIND[elementName];
       if (otherKind === kind) continue;
       const other = rec[elementName];
       if (other) this.#release(rec, otherKind, other);
@@ -74,58 +98,69 @@ export default class PlayerBroker {
     return element;
   }
 
-  play(sessionId) {
+  play(sessionId: string): Promise<void> | undefined {
     return this.#current(sessionId)?.play();
   }
 
-  pause(sessionId) {
+  pause(sessionId: string): void {
     this.#current(sessionId)?.pause();
   }
 
-  seek(sessionId, seconds) {
+  seek(sessionId: string, seconds: number): void {
     const el = this.#current(sessionId);
     if (el && Number.isFinite(seconds)) el.currentTime = seconds;
   }
 
-  getState(sessionId) {
+  getState(sessionId: string): PlayerState {
     return this.#record(sessionId).state;
   }
 
-  getCurrentElement(sessionId) {
-    return this.#current(sessionId) ?? null;
+  getCurrentElement(sessionId: string): HTMLMediaElement | null {
+    return this.#current(sessionId);
   }
 
   /**
    * Puts the active element into the view's stage. Safe to call before a load.
    */
-  attachTo(sessionId, container) {
+  attachTo(sessionId: string, container: HTMLElement): void {
     const rec = this.#record(sessionId);
     rec.container = container;
     const el = this.#current(sessionId);
     if (el) container.replaceChildren(el);
   }
 
-  #record(sessionId) {
-    let rec = this.sessions.get(sessionId);
+  #record(sessionId: string): SessionRecord {
+    let rec = this.#sessions.get(sessionId);
     if (!rec) {
-      rec = { audioClean: null, video: null, urls: new Map(), container: null, currentType: null, track: null, state: 'idle', lastGood: null, loadId: 0 };
-      this.sessions.set(sessionId, rec);
+      rec = {
+        audioClean: null,
+        video: null,
+        urls: new Map(),
+        container: null,
+        currentType: null,
+        track: null,
+        state: 'idle',
+        lastGood: null,
+        loadId: 0,
+      };
+      this.#sessions.set(sessionId, rec);
     }
     return rec;
   }
 
-  #current(sessionId) {
-    const rec = this.sessions.get(sessionId);
+  #current(sessionId: string): HTMLMediaElement | null {
+    const rec = this.#sessions.get(sessionId);
     if (!rec?.currentType) return null;
     return rec[KIND_TO_ELEMENT[rec.currentType]] ?? null;
   }
 
-  #ensureElement(sessionId, kind) {
+  #ensureElement(sessionId: string, kind: TrackKind): HTMLMediaElement {
     const rec = this.#record(sessionId);
     const name = KIND_TO_ELEMENT[kind];
-    if (rec[name]) return rec[name];
+    const existing = rec[name];
+    if (existing) return existing;
 
-    const el = document.createElement(kind === 'audio' ? 'audio' : 'video');
+    const el: HTMLMediaElement = document.createElement(kind === 'audio' ? 'audio' : 'video');
     el.preload = 'metadata';
     el.setAttribute('controls', ''); // M2 only; custom overlay replaces this in M3
     el.setAttribute('playsinline', ''); // iOS: otherwise video hijacks fullscreen
@@ -139,7 +174,7 @@ export default class PlayerBroker {
     return el;
   }
 
-  #bind(el, sessionId, kind) {
+  #bind(el: HTMLMediaElement, sessionId: string, kind: TrackKind): void {
     el.addEventListener('loadedmetadata', () => {
       if (this.#current(sessionId) !== el) return;
       dispatch('time-update', { sessionId, currentTime: el.currentTime, duration: el.duration });
@@ -175,16 +210,16 @@ export default class PlayerBroker {
     });
   }
 
-  #pauseOthers(playingElement) {
-    for (const rec of this.sessions.values()) {
-      for (const name of Object.keys(ELEMENT_TO_KIND)) {
+  #pauseOthers(playingElement: HTMLMediaElement): void {
+    for (const rec of this.#sessions.values()) {
+      for (const name of ELEMENT_NAMES) {
         const el = rec[name];
         if (el && el !== playingElement && !el.paused) el.pause();
       }
     }
   }
 
-  #release(rec, kind, element) {
+  #release(rec: SessionRecord, kind: TrackKind, element: HTMLMediaElement): void {
     const prev = rec.urls.get(kind);
     // Nothing loaded yet: load() on an empty src can raise error in Safari.
     if (!prev) return;
@@ -195,13 +230,13 @@ export default class PlayerBroker {
     rec.urls.delete(kind);
   }
 
-  #mount(sessionId, element) {
-    const rec = this.sessions.get(sessionId);
+  #mount(sessionId: string, element: HTMLMediaElement): void {
+    const rec = this.#record(sessionId);
     if (!rec.container) return;
     if (rec.container.firstChild !== element) rec.container.replaceChildren(element);
   }
 
-  #setState(sessionId, state) {
+  #setState(sessionId: string, state: PlayerState): void {
     const rec = this.#record(sessionId);
     if (rec.state === state) return;
     rec.state = state;
@@ -209,18 +244,18 @@ export default class PlayerBroker {
   }
 }
 
-function onceLoaded(el, timeoutMs = LOAD_TIMEOUT_MS) {
+function onceLoaded(el: HTMLMediaElement, timeoutMs = LOAD_TIMEOUT_MS): Promise<void> {
   return new Promise((resolve, reject) => {
-    let timer;
-    const ok = () => {
+    let timer: ReturnType<typeof setTimeout>;
+    const ok = (): void => {
       cleanup();
       resolve();
     };
-    const fail = () => {
+    const fail = (): void => {
       cleanup();
       reject(new Error('Media element failed to load'));
     };
-    const cleanup = () => {
+    const cleanup = (): void => {
       clearTimeout(timer);
       el.removeEventListener('loadedmetadata', ok);
       el.removeEventListener('error', fail);
@@ -234,6 +269,6 @@ function onceLoaded(el, timeoutMs = LOAD_TIMEOUT_MS) {
   });
 }
 
-function dispatch(type, detail) {
+function dispatch(type: string, detail: unknown): void {
   document.dispatchEvent(new CustomEvent(type, { detail }));
 }

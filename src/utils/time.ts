@@ -1,9 +1,7 @@
 /**
  * Formats seconds as m:ss, or h:mm:ss past an hour.
- * @param {number} seconds
- * @returns {string}
  */
-export function formatTime(seconds) {
+export function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
   const total = Math.floor(seconds);
   const s = total % 60;
