@@ -5,7 +5,7 @@ import type Toasts from '../ui/toasts';
 import { formatTime } from '../utils/time';
 
 // Milestone 2 is single-session. Session tabs arrive at M9.
-export const SESSION_ID = 'main';
+export const SESSION_ID = 'default';
 
 interface VideosViewDeps {
   broker: PlayerBroker;

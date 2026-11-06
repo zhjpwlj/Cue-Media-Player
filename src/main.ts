@@ -15,19 +15,28 @@ bootPromise.then(() => {
   document.dispatchEvent(new CustomEvent('boot-complete'));
 });
 
+const toasts = new Toasts();
+document.addEventListener('toast', (e) => {
+  toasts.show((e as CustomEvent<{ message: string }>).detail.message);
+});
+
 void start();
 
 async function start(): Promise<void> {
-  const sessions = new SessionManager();
-  await sessions.init();
-  const broker = new PlayerBroker();
-  const playlist = new PlaylistManager(sessions, broker);
+  try {
+    const sessions = new SessionManager();
+    await sessions.init();
+    const broker = new PlayerBroker();
+    const playlist = new PlaylistManager(sessions, broker);
 
-  new VideosView({
-    broker,
-    fileHandler: new FileHandler(playlist),
-    toasts: new Toasts(),
-  }).mount(document.querySelector<HTMLElement>('.app-main')!);
+    new VideosView({
+      broker,
+      fileHandler: new FileHandler(playlist),
+      toasts,
+    }).mount(document.querySelector<HTMLElement>('.app-main')!);
+  } catch {
+    toasts.show('Cue failed to start.');
+  }
 }
 
 async function boot(): Promise<void> {

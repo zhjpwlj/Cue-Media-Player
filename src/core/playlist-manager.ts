@@ -44,7 +44,7 @@ export default class PlaylistManager {
       document.dispatchEvent(
         new CustomEvent('toast', { detail: { message: `Could not load ${file.name}.` } }),
       );
-      return track;
+      return null;
     }
 
     // Load succeeded: replace the single-track playlist. One file per session

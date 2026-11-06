@@ -63,11 +63,9 @@ test('PlaylistManager keeps the previous state when loadTrack rejects', async ()
   const playlist = new PlaylistManager(sessions, {
     loadTrack: async () => { throw new Error('load failed'); },
   });
-  const track = await playlist.addFiles([file('bad.mp3', 'audio/mpeg')]);
-  assert.equal(track.name, 'bad');
+  assert.equal(await playlist.addFiles([file('bad.mp3', 'audio/mpeg')]), null);
   assert.deepEqual(session.playlist, [previous]);
   assert.equal(session.currentIndex, 0);
-  assert.equal(playlist.getFile(track.id), null);
 
   const toasts = events.filter((e) => e.type === 'toast');
   assert.equal(toasts.length, 1);
@@ -82,6 +80,7 @@ test('mediaFiles filters folders to supported media', async () => {
 });
 
 test('openFolderPicker filters non-media and resets the input', async () => {
+  events.length = 0;
   const appended = [];
   const input = {
     type: '',
@@ -129,6 +128,42 @@ test('openFolderPicker filters non-media and resets the input', async () => {
     assert.equal(added.length, 1);
     assert.deepEqual(added[0].map((f) => f.name), ['a.mp3', 'c.mov']);
     assert.equal(input.value, '');
+  } finally {
+    globalThis.document = original;
+  }
+});
+
+test('openFolderPicker does nothing without webkitdirectory support', async () => {
+  events.length = 0;
+  const appended = [];
+  let clicked = 0;
+  // No `webkitdirectory` key: simulates a platform without folder picking.
+  const input = {
+    type: '',
+    multiple: false,
+    hidden: false,
+    value: '',
+    files: [],
+    listeners: {},
+    addEventListener(type, fn) {
+      (this.listeners[type] ??= []).push(fn);
+    },
+    click() {
+      clicked += 1;
+    },
+  };
+  const original = globalThis.document;
+  globalThis.document = {
+    dispatchEvent: (e) => events.push(e),
+    createElement: () => input,
+    body: { append: (node) => appended.push(node) },
+  };
+
+  try {
+    const { default: FileHandler } = await import('../../src/core/file-handler.ts');
+    new FileHandler({ addFiles: async () => null }).openFolderPicker();
+    assert.equal(appended.length, 0);
+    assert.equal(clicked, 0);
   } finally {
     globalThis.document = original;
   }
