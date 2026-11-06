@@ -34,3 +34,30 @@ test('no 100vh and no userAgent sniffing in app sources', () => {
   }
   assert.ok(!/navigator\.userAgent/.test(read('src/main.ts')));
 });
+
+test('videos layout DOM exposes required controls', () => {
+  const html = read('src/index.html');
+  for (const id of [
+    'view-videos', 'app-header', 'session-title', 'player-media-slot',
+    'controls-overlay', 'btn-play-pause', 'seek-bar', 'time-display',
+    'btn-volume', 'volume-slider', 'btn-select-file', 'btn-select-folder',
+    'playlist-items', 'track-name',
+  ]) {
+    assert.ok(html.includes(`id="${id}"`), `missing #${id}`);
+  }
+  // Touch has no hover: the overlay starts visible.
+  assert.match(html, /id="player-container"[^>]*class="[^"]*show-controls/);
+  // Future-milestone controls must not be silently inert.
+  for (const id of ['btn-menu', 'btn-theme', 'btn-prev', 'btn-next', 'btn-subtitles', 'btn-pip', 'btn-fullscreen']) {
+    const tag = html.match(new RegExp(`<button[^>]*id="${id}"[^>]*>`))?.[0] ?? '';
+    assert.ok(tag.includes('disabled'), `${id} must be disabled`);
+    assert.ok(tag.includes('title='), `${id} must explain when it is enabled`);
+  }
+});
+
+test('layout CSS never uses 100vh and keeps safe-area off the view', () => {
+  const css = read('src/css/layout-videos.css');
+  assert.ok(!/\b100vh\b/.test(css));
+  assert.ok(!/safe-area-inset/.test(css), 'safe-area belongs to body');
+  assert.ok(!/100dvh/.test(css), 'view must not claim viewport height');
+});

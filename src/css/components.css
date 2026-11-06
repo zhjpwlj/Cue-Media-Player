@@ -1,38 +1,4 @@
-/* Milestone 2 view styles. Structural shell lives in base.css. */
-
-.videos-view {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 20px 16px;
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.videos-toolbar {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.videos-heading {
-  min-width: 0;
-}
-
-.videos-title {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.videos-subtitle {
-  margin: 2px 0 0;
-  color: var(--text-secondary);
-  font-size: 14px;
-  overflow-wrap: anywhere;
-}
+/* Shared controls and toasts. The videos layout lives in layout-videos.css. */
 
 .btn {
   flex: 0 0 auto;
@@ -62,45 +28,6 @@
   background: var(--accent-hover);
 }
 
-.player-stage {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 180px;
-  padding: 12px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  background: var(--bg-secondary);
-  overflow: hidden;
-}
-
-.player-stage video {
-  display: block;
-  width: 100%;
-  max-height: 60dvh;
-  border-radius: calc(var(--border-radius) - 4px);
-  background: #000;
-}
-
-.player-stage audio {
-  width: 100%;
-}
-
-.player-empty {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 14px;
-  text-align: center;
-}
-
-.player-time {
-  margin: 0;
-  min-height: 1.4em;
-  font-family: var(--font-family-mono);
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
 .toasts {
   position: fixed;
   left: 50%;
@@ -124,11 +51,4 @@
   box-shadow: var(--shadow);
   font-size: 14px;
   overflow-wrap: anywhere;
-}
-
-@media (max-width: 520px) {
-  .videos-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
 }

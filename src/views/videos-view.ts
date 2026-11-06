@@ -1,133 +1,318 @@
 import { mediaKind } from '../core/file-handler';
 import type FileHandler from '../core/file-handler';
+import type PlaylistManager from '../core/playlist-manager';
 import type PlayerBroker from '../core/player-broker';
+import type { PlayerState, Track } from '../core/player-broker';
+import type SessionManager from '../core/session-manager';
+import type { Session } from '../core/session-manager';
 import type Toasts from '../ui/toasts';
 import { formatTime } from '../utils/time';
-
-// Milestone 2 is single-session. Session tabs arrive at M9.
-export const SESSION_ID = 'default';
 
 interface VideosViewDeps {
   broker: PlayerBroker;
   fileHandler: FileHandler;
+  playlist: PlaylistManager;
   toasts: Toasts;
+  sessions: SessionManager;
 }
 
 interface TrackChangedDetail {
   sessionId: string;
-  track: { name: string };
+  track: Track;
 }
 interface TimeUpdateDetail {
   sessionId: string;
   currentTime: number;
   duration: number;
 }
+interface StateChangedDetail {
+  sessionId: string;
+  state: PlayerState;
+}
 interface PlaybackErrorDetail {
   sessionId: string;
   message: string;
 }
+interface PlaylistUpdatedDetail {
+  sessionId: string;
+}
+
+type AirPlayElement = HTMLMediaElement & {
+  webkitShowPlaybackTargetPicker?: () => void;
+};
 
 /**
- * Single-track view: pick a file, hand it to the broker, show native controls.
+ * Videos layout for Milestone 3. The DOM is static in index.html; this class
+ * only binds it. Transport, volume, mute, and the folder picker live here so
+ * the audio/video element swap keeps a single visible control set.
  */
 export default class VideosView {
   #broker: PlayerBroker;
   #fileHandler: FileHandler;
+  #playlist: PlaylistManager;
   #toasts: Toasts;
-  #stage!: HTMLElement;
-  #status!: HTMLElement;
-  #time!: HTMLElement;
-  #empty!: HTMLElement;
+  #sessions: SessionManager;
 
-  constructor({ broker, fileHandler, toasts }: VideosViewDeps) {
+  #playerContainer!: HTMLElement;
+  #mediaSlot!: HTMLElement;
+  #sessionTitle!: HTMLElement;
+  #trackName!: HTMLElement;
+  #trackBadge!: HTMLElement;
+  #playPause!: HTMLButtonElement;
+  #seekBar!: HTMLInputElement;
+  #timeDisplay!: HTMLElement;
+  #volumeButton!: HTMLButtonElement;
+  #volumeSlider!: HTMLInputElement;
+  #playlistItems!: HTMLElement;
+  #airplayButton!: HTMLButtonElement;
+  #folderButton!: HTMLButtonElement;
+
+  // Session has no volume field in M3: volume is view state, mute is session state.
+  #volume = 1;
+
+  constructor({ broker, fileHandler, playlist, toasts, sessions }: VideosViewDeps) {
     this.#broker = broker;
     this.#fileHandler = fileHandler;
+    this.#playlist = playlist;
     this.#toasts = toasts;
+    this.#sessions = sessions;
   }
 
   mount(container: HTMLElement): void {
-    container.innerHTML = `
-      <section class="videos-view">
-        <div class="videos-toolbar">
-          <div class="videos-heading">
-            <h1 class="videos-title">Videos</h1>
-            <p class="videos-subtitle" data-role="status">No file open</p>
-          </div>
-          <button class="btn btn-primary" type="button" data-role="open">Open file</button>
-        </div>
-        <div class="player-stage" data-role="stage">
-          <p class="player-empty" data-role="empty">Choose an audio or video file.</p>
-        </div>
-        <p class="player-time" data-role="time"></p>
-      </section>`;
+    this.#playerContainer = this.#el('player-container');
+    this.#mediaSlot = this.#el('player-media-slot');
+    this.#sessionTitle = this.#el('session-title');
+    this.#trackName = this.#el('track-name');
+    this.#trackBadge = this.#el('track-type-badge');
+    this.#playPause = this.#el<HTMLButtonElement>('btn-play-pause');
+    this.#seekBar = this.#el<HTMLInputElement>('seek-bar');
+    this.#timeDisplay = this.#el('time-display');
+    this.#volumeButton = this.#el<HTMLButtonElement>('btn-volume');
+    this.#volumeSlider = this.#el<HTMLInputElement>('volume-slider');
+    this.#playlistItems = this.#el('playlist-items');
+    this.#airplayButton = this.#el<HTMLButtonElement>('btn-airplay');
+    this.#folderButton = this.#el<HTMLButtonElement>('btn-select-folder');
 
-    const el = (role: string): HTMLElement => {
-      const node = container.querySelector(`[data-role="${role}"]`);
-      if (!node) throw new Error(`missing [data-role="${role}"]`);
-      return node as HTMLElement;
-    };
-    const openButton = el('open');
-    this.#stage = el('stage');
-    this.#status = el('status');
-    this.#time = el('time');
-    this.#empty = el('empty');
+    this.#broker.attachTo(this.#sessions.activeSessionId, this.#mediaSlot);
+    this.#bindControls();
+    this.#bindDocumentEvents();
 
-    openButton.addEventListener('click', () => void this.#open());
-    this.#broker.attachTo(SESSION_ID, this.#stage);
+    this.onActivate(this.#sessions.getActive());
+    this.onPlaylistUpdated();
+    this.#refreshAirplay();
+  }
 
-    document.addEventListener('track-changed', (e) => {
-      const detail = (e as CustomEvent<TrackChangedDetail>).detail;
-      if (detail.sessionId !== SESSION_ID) return;
-      this.#status.textContent = detail.track.name;
+  onActivate(session: Session): void {
+    this.#sessionTitle.textContent = session.name;
+    this.#renderPlaylist();
+    this.#applyVolume();
+  }
+
+  onPlaylistUpdated(): void {
+    this.#renderPlaylist();
+  }
+
+  #el<T extends HTMLElement>(id: string): T {
+    const node = document.getElementById(id);
+    if (!node) throw new Error(`missing #${id}`);
+    return node as T;
+  }
+
+  #bindControls(): void {
+    this.#playerContainer.addEventListener('pointerdown', (event) => {
+      if ((event.target as Element).closest('#controls-overlay')) return;
+      this.#playerContainer.classList.toggle('show-controls');
     });
 
-    document.addEventListener('time-update', (e) => {
-      const detail = (e as CustomEvent<TimeUpdateDetail>).detail;
-      if (detail.sessionId !== SESSION_ID) return;
-      this.#time.textContent = `${formatTime(detail.currentTime)} / ${formatTime(detail.duration)}`;
+    this.#playPause.addEventListener('click', () => this.#togglePlay());
+    this.#seekBar.addEventListener('input', () => this.#seekToSlider());
+
+    this.#volumeSlider.addEventListener('input', () => {
+      this.#volume = Number(this.#volumeSlider.value);
+      const session = this.#sessions.getActive();
+      if (this.#volume > 0 && session.muted) session.muted = false;
+      this.#applyVolume();
     });
 
-    document.addEventListener('playback-error', (e) => {
-      const detail = (e as CustomEvent<PlaybackErrorDetail>).detail;
-      if (detail.sessionId !== SESSION_ID) return;
+    this.#volumeButton.addEventListener('click', () => {
+      const session = this.#sessions.getActive();
+      session.muted = !session.muted;
+      this.#applyVolume();
+    });
+
+    this.#el<HTMLButtonElement>('btn-select-file').addEventListener('click', () => {
+      void this.#open();
+    });
+
+    if ('webkitdirectory' in document.createElement('input')) {
+      this.#folderButton.addEventListener('click', () => this.#fileHandler.openFolderPicker());
+    } else {
+      this.#folderButton.hidden = true;
+      this.#folderButton.title = 'Folder selection is unavailable in this browser';
+    }
+
+    this.#airplayButton.addEventListener('click', () => {
+      const el = this.#broker.getCurrentElement(this.#sessions.activeSessionId) as AirPlayElement | null;
+      if (typeof el?.webkitShowPlaybackTargetPicker !== 'function') {
+        this.#refreshAirplay();
+        return;
+      }
+      el.webkitShowPlaybackTargetPicker();
+    });
+
+    this.#el<HTMLButtonElement>('btn-info').addEventListener('click', () => {
+      this.#toasts.show('Track details arrive with metadata extraction (M11).');
+    });
+  }
+
+  #bindDocumentEvents(): void {
+    document.addEventListener('track-changed', (event) => {
+      const detail = (event as CustomEvent<TrackChangedDetail>).detail;
+      if (!this.#isActive(detail.sessionId)) return;
+      this.#onTrackChanged(detail);
+    });
+
+    document.addEventListener('time-update', (event) => {
+      const detail = (event as CustomEvent<TimeUpdateDetail>).detail;
+      if (!this.#isActive(detail.sessionId)) return;
+      this.#onTimeUpdate(detail);
+    });
+
+    document.addEventListener('state-changed', (event) => {
+      const detail = (event as CustomEvent<StateChangedDetail>).detail;
+      if (!this.#isActive(detail.sessionId)) return;
+      this.#onStateChanged(detail.state);
+    });
+
+    document.addEventListener('playback-error', (event) => {
+      const detail = (event as CustomEvent<PlaybackErrorDetail>).detail;
+      if (!this.#isActive(detail.sessionId)) return;
       this.#toasts.show(detail.message);
     });
+
+    document.addEventListener('playlist-updated', (event) => {
+      const detail = (event as CustomEvent<PlaylistUpdatedDetail>).detail;
+      if (!this.#isActive(detail.sessionId)) return;
+      this.onPlaylistUpdated();
+    });
+  }
+
+  #isActive(sessionId: string): boolean {
+    return sessionId === this.#sessions.activeSessionId;
   }
 
   async #open(): Promise<void> {
     const files = await this.#fileHandler.openFilePicker();
     if (files.length === 0) return;
 
-    const file = files.find((f) => mediaKind(f));
+    const file = files.find((candidate) => mediaKind(candidate));
     if (!file) {
       this.#toasts.show('That file type is not supported yet.');
       return;
     }
 
-    const type = mediaKind(file);
-    if (!type) return;
-    this.#status.textContent = `Loading ${file.name}…`;
-    try {
-      await this.#broker.loadTrack(
-        SESSION_ID,
-        {
-          id: `${Date.now()}`,
-          name: file.name,
-          type,
-          fileSize: file.size,
-          fileLastModified: file.lastModified,
-        },
-        file,
-      );
-    } catch {
-      // The broker restores the last good track; only clear the stage when
-      // there is nothing left to show.
-      if (!this.#broker.getCurrentElement(SESSION_ID)) {
-        this.#stage.replaceChildren(this.#empty);
-        this.#status.textContent = 'No file open';
-        this.#time.textContent = '';
-      }
-      this.#toasts.show(`Could not load ${file.name}.`);
+    this.#trackName.textContent = `Loading ${file.name}…`;
+    const track = await this.#playlist.addFiles([file]);
+    if (track) return;
+
+    // PlaylistManager already toasted. Keep the previous track visible: the
+    // broker restores it and emits track-changed, or there was none at all.
+    const session = this.#sessions.getActive();
+    const current = session.playlist[session.currentIndex];
+    this.#trackName.textContent = current?.name ?? 'No file open';
+  }
+
+  #onTrackChanged(detail: TrackChangedDetail): void {
+    const session = this.#sessions.getActive();
+    session.currentTrackType = detail.track.type;
+    this.#trackName.textContent = detail.track.name;
+    this.#trackBadge.textContent = detail.track.type === 'video' ? 'Video' : 'Audio';
+    this.#seekBar.value = '0';
+    this.#timeDisplay.textContent = '0:00 / 0:00';
+    this.#applyVolume();
+    this.#refreshAirplay();
+  }
+
+  #onTimeUpdate(detail: TimeUpdateDetail): void {
+    const fraction = detail.duration > 0 ? detail.currentTime / detail.duration : 0;
+    this.#seekBar.value = String(Math.round(Math.min(1, Math.max(0, fraction)) * 1000));
+    this.#timeDisplay.textContent = `${formatTime(detail.currentTime)} / ${formatTime(detail.duration)}`;
+  }
+
+  #onStateChanged(state: PlayerState): void {
+    const playing = state === 'playing';
+    this.#playPause.textContent = playing ? '❚❚' : '▶';
+    this.#playPause.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  }
+
+  #togglePlay(): void {
+    const session = this.#sessions.getActive();
+    if (this.#broker.getState(session.id) === 'playing') {
+      this.#broker.pause(session.id);
+      return;
     }
+    void this.#broker
+      .play(session.id)
+      ?.catch(() => this.#toasts.show('Playback was blocked by the browser.'));
+  }
+
+  #seekToSlider(): void {
+    const el = this.#broker.getCurrentElement(this.#sessions.activeSessionId);
+    if (!el || !Number.isFinite(el.duration) || el.duration <= 0) return;
+    const seconds = (Number(this.#seekBar.value) / 1000) * el.duration;
+    this.#broker.seek(this.#sessions.activeSessionId, seconds);
+  }
+
+  #applyVolume(): void {
+    const session = this.#sessions.getActive();
+    const el = this.#broker.getCurrentElement(session.id);
+    if (el) {
+      el.volume = this.#volume;
+      el.muted = session.muted;
+    }
+    this.#volumeSlider.value = String(this.#volume);
+    this.#volumeButton.textContent = session.muted ? '🔇' : '🔊';
+    this.#volumeButton.setAttribute('aria-label', session.muted ? 'Unmute' : 'Mute');
+  }
+
+  #refreshAirplay(): void {
+    const el = this.#broker.getCurrentElement(this.#sessions.activeSessionId) as AirPlayElement | null;
+    if (typeof el?.webkitShowPlaybackTargetPicker !== 'function') {
+      this.#airplayButton.disabled = true;
+      this.#airplayButton.setAttribute('aria-disabled', 'true');
+      this.#airplayButton.title = 'AirPlay is unavailable in this browser';
+      return;
+    }
+    this.#airplayButton.disabled = false;
+    this.#airplayButton.removeAttribute('aria-disabled');
+    this.#airplayButton.removeAttribute('title');
+  }
+
+  #renderPlaylist(): void {
+    const session = this.#sessions.getActive();
+    this.#playlistItems.replaceChildren();
+    session.playlist.forEach((track, index) => {
+      const item = document.createElement('li');
+      item.textContent = track.name;
+      item.dataset.index = String(index);
+      if (index === session.currentIndex) item.classList.add('active');
+      item.addEventListener('click', () => this.#reloadActive(index));
+      this.#playlistItems.append(item);
+    });
+  }
+
+  #reloadActive(index: number): void {
+    const session = this.#sessions.getActive();
+    // M3 has one item per session; M4 adds playIndex and full queue loading.
+    if (index !== session.currentIndex) return;
+    if (this.#broker.getState(session.id) === 'loading') return;
+
+    const track = session.playlist[index];
+    const file = track ? this.#playlist.getFile(track.id) : null;
+    if (!track || !file) return;
+
+    void this.#broker.loadTrack(session.id, track, file).catch(() => {
+      this.#toasts.show(`Could not load ${track.name}.`);
+    });
   }
 }

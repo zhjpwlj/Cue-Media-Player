@@ -32,7 +32,9 @@ async function start(): Promise<void> {
     new VideosView({
       broker,
       fileHandler: new FileHandler(playlist),
+      playlist,
       toasts,
+      sessions,
     }).mount(document.querySelector<HTMLElement>('.app-main')!);
   } catch {
     toasts.show('Cue failed to start.');

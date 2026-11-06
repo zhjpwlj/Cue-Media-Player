@@ -1,0 +1,205 @@
+/* Milestone 3 videos layout. Height comes from .app-main (body owns the
+   viewport and the safe-area insets); never claim viewport height here. */
+
+#view-videos {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--header-height);
+  padding: 0 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+#session-title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.main-layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr var(--sidebar-width);
+  gap: 16px;
+  padding: 16px;
+}
+
+@media (max-width: 899px) {
+  .main-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.video-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+#player-container {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+@media (max-width: 899px) {
+  #player-container {
+    aspect-ratio: 4 / 3;
+  }
+}
+
+#player-media-slot {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#player-media-slot video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+#player-media-slot audio {
+  width: calc(100% - 32px);
+}
+
+#controls-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(transparent, rgb(0 0 0 / 0.8));
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+#player-container:hover #controls-overlay,
+#player-container.show-controls #controls-overlay {
+  opacity: 1;
+}
+
+#controls-overlay button {
+  background: none;
+  border: 0;
+  color: var(--text-primary);
+  font: inherit;
+  padding: 6px;
+}
+
+#controls-overlay button:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+#seek-bar {
+  flex: 1;
+  min-width: 0;
+}
+
+#time-display {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+#volume-slider {
+  width: 80px;
+}
+
+#track-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 1.4em;
+}
+
+#track-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+#track-type-badge {
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+#action-row {
+  display: flex;
+  gap: 8px;
+}
+
+#action-row button:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+#playlist-sidebar {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 12px;
+  min-width: 0;
+}
+
+#playlist-sidebar header {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+#playlist-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#playlist-items li {
+  padding: 8px 12px;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+#playlist-items li:hover {
+  background: var(--bg-hover);
+}
+
+#playlist-items li.active {
+  background: var(--playlist-active-bg);
+  border-left: 3px solid var(--playlist-active-border);
+}
+
+#app-footer {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+@media (max-width: 520px) {
+  #volume-slider {
+    display: none;
+  }
+
+  #time-display {
+    font-size: 11px;
+  }
+}

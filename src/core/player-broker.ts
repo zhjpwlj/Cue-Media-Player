@@ -164,7 +164,7 @@ export default class PlayerBroker {
 
     const el: HTMLMediaElement = document.createElement(kind === 'audio' ? 'audio' : 'video');
     el.preload = 'metadata';
-    el.setAttribute('controls', ''); // M2 only; custom overlay replaces this in M3
+    // No native controls: the Videos view owns the transport overlay.
     el.setAttribute('playsinline', ''); // iOS: otherwise video hijacks fullscreen
     el.setAttribute('webkit-playsinline', '');
     el.setAttribute('x-webkit-airplay', 'allow');

@@ -13,13 +13,57 @@
     <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon-180.png" />
     <link rel="stylesheet" href="/css/base.css" />
     <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/layout-videos.css" />
   </head>
   <body>
     <div class="app-shell">
-      <header class="app-header" id="app-header">cue</header>
-      <main class="app-main"></main>
+      <main class="app-main">
+        <section id="view-videos">
+          <header class="top-bar" id="app-header">
+            <button id="btn-menu" type="button" disabled aria-disabled="true" title="Sessions — available in M9">☰</button>
+            <span id="session-title">Cue 1</span>
+            <button id="btn-theme" type="button" disabled aria-disabled="true" title="Themes — available in M8">◐</button>
+          </header>
+          <div class="main-layout">
+            <div class="video-column">
+              <section id="player-container" class="show-controls">
+                <div id="player-media-slot"></div>
+                <div id="controls-overlay">
+                  <button id="btn-prev" type="button" disabled aria-disabled="true" title="Previous — available in M4">⏮</button>
+                  <button id="btn-play-pause" type="button" aria-label="Play">▶</button>
+                  <button id="btn-next" type="button" disabled aria-disabled="true" title="Next — available in M4">⏭</button>
+                  <input id="seek-bar" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek">
+                  <span id="time-display">0:00 / 0:00</span>
+                  <button id="btn-volume" type="button" aria-label="Mute">🔊</button>
+                  <input id="volume-slider" type="range" min="0" max="1" value="1" step="0.01" aria-label="Volume">
+                  <button id="btn-subtitles" type="button" disabled aria-disabled="true" title="Subtitles — available in M11">CC</button>
+                  <button id="btn-pip" type="button" disabled aria-disabled="true" title="Picture in picture — available in M7">PiP</button>
+                  <button id="btn-airplay" type="button" aria-label="AirPlay">AirPlay</button>
+                  <button id="btn-fullscreen" type="button" disabled aria-disabled="true" title="Fullscreen — available in M7">⛶</button>
+                </div>
+              </section>
+              <section id="track-info">
+                <span id="track-name">No file open</span>
+                <span id="track-type-badge"></span>
+              </section>
+              <section id="action-row">
+                <button id="btn-favorite" type="button" disabled aria-disabled="true" title="Favorites — planned">☆</button>
+                <button id="btn-info" type="button">Info</button>
+              </section>
+            </div>
+            <aside id="playlist-sidebar">
+              <header>Up Next</header>
+              <ul id="playlist-items"></ul>
+            </aside>
+          </div>
+          <footer id="app-footer">
+            <button id="btn-select-file" class="btn btn-primary" type="button">Select file</button>
+            <button id="btn-select-folder" class="btn" type="button">Select folder</button>
+          </footer>
+        </section>
+      </main>
     </div>
-    <footer class="app-footer">v0.3.0</footer>
+    <footer class="app-version">v0.4.0</footer>
     <script type="module" src="/main.ts"></script>
     <script type="module" src="/diagnostics.ts"></script>
   </body>
