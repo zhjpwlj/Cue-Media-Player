@@ -110,7 +110,13 @@ export default class VideosView {
     try {
       await this.#broker.loadTrack(
         SESSION_ID,
-        { id: `${Date.now()}`, name: file.name, type },
+        {
+          id: `${Date.now()}`,
+          name: file.name,
+          type,
+          fileSize: file.size,
+          fileLastModified: file.lastModified,
+        },
         file,
       );
     } catch {

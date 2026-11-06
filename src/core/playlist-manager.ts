@@ -1,4 +1,3 @@
-// @ts-expect-error Node's type stripping requires an explicit .ts extension.
 import { mediaKind } from './file-handler.ts';
 import type PlayerBroker from './player-broker';
 import type { Track } from './player-broker';
@@ -38,19 +37,23 @@ export default class PlaylistManager {
       fileLastModified: file.lastModified,
     };
 
-    this.#files.set(track.id, file);
     const session = this.#sessions.getActive();
-    session.playlist = [track];
-    session.currentIndex = 0;
-    document.dispatchEvent(new CustomEvent('playlist-updated', { detail: { sessionId: session.id } }));
-
     try {
       await this.#broker.loadTrack(session.id, track, file);
     } catch {
       document.dispatchEvent(
         new CustomEvent('toast', { detail: { message: `Could not load ${file.name}.` } }),
       );
+      return track;
     }
+
+    // Load succeeded: replace the single-track playlist. One file per session
+    // in M3, so drop the previous File to keep the map from growing.
+    this.#files.clear();
+    this.#files.set(track.id, file);
+    session.playlist = [track];
+    session.currentIndex = 0;
+    document.dispatchEvent(new CustomEvent('playlist-updated', { detail: { sessionId: session.id } }));
     return track;
   }
 

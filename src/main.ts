@@ -5,6 +5,8 @@
 
 import PlayerBroker from './core/player-broker';
 import FileHandler from './core/file-handler';
+import PlaylistManager from './core/playlist-manager';
+import SessionManager from './core/session-manager';
 import Toasts from './ui/toasts';
 import VideosView from './views/videos-view';
 
@@ -13,11 +15,20 @@ bootPromise.then(() => {
   document.dispatchEvent(new CustomEvent('boot-complete'));
 });
 
-new VideosView({
-  broker: new PlayerBroker(),
-  fileHandler: new FileHandler(),
-  toasts: new Toasts(),
-}).mount(document.querySelector<HTMLElement>('.app-main')!);
+void start();
+
+async function start(): Promise<void> {
+  const sessions = new SessionManager();
+  await sessions.init();
+  const broker = new PlayerBroker();
+  const playlist = new PlaylistManager(sessions, broker);
+
+  new VideosView({
+    broker,
+    fileHandler: new FileHandler(playlist),
+    toasts: new Toasts(),
+  }).mount(document.querySelector<HTMLElement>('.app-main')!);
+}
 
 async function boot(): Promise<void> {
   const reg = await registerServiceWorker();

@@ -21,11 +21,11 @@ export function mediaFiles(files: File[]): File[] {
 }
 
 export default class FileHandler {
-  #playlist: PlaylistManager | null;
+  #playlist: PlaylistManager;
   #folderInput: HTMLInputElement | null = null;
 
-  constructor(playlist?: PlaylistManager) {
-    this.#playlist = playlist ?? null;
+  constructor(playlist: PlaylistManager) {
+    this.#playlist = playlist;
   }
 
   /**
@@ -62,13 +62,19 @@ export default class FileHandler {
   openFolderPicker(): void {
     if (!this.#folderInput) {
       const input = document.createElement('input');
+      // Unsupported platforms skip the picker rather than opening an empty one.
+      if (!('webkitdirectory' in input)) return;
       input.type = 'file';
       input.webkitdirectory = true;
       input.multiple = true;
       input.hidden = true;
       input.addEventListener('change', () => {
         const files = mediaFiles([...(input.files ?? [])]);
-        if (this.#playlist) void this.#playlist.addFiles(files);
+        void this.#playlist.addFiles(files).catch(() => {
+          document.dispatchEvent(
+            new CustomEvent('toast', { detail: { message: 'Could not load that folder.' } }),
+          );
+        });
         input.value = ''; // reset for same-folder re-pick
       });
       document.body.append(input);

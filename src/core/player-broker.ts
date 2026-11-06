@@ -10,9 +10,8 @@ export interface Track {
   id: string;
   name: string;
   type: TrackKind;
-  // Optional until every construction site (M3 view rewiring) supplies them.
-  fileSize?: number;
-  fileLastModified?: number;
+  fileSize: number;
+  fileLastModified: number;
 }
 
 export type PlayerState = 'idle' | 'loading' | 'playing' | 'paused' | 'ended';
@@ -165,6 +164,7 @@ export default class PlayerBroker {
 
     const el: HTMLMediaElement = document.createElement(kind === 'audio' ? 'audio' : 'video');
     el.preload = 'metadata';
+    el.setAttribute('controls', ''); // M2 only; custom overlay replaces this in M3
     el.setAttribute('playsinline', ''); // iOS: otherwise video hijacks fullscreen
     el.setAttribute('webkit-playsinline', '');
     el.setAttribute('x-webkit-airplay', 'allow');
