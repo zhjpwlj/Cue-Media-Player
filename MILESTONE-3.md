@@ -81,7 +81,7 @@ Build: `npm run build` exit 0, 10 precached URLs, one CSS asset.
 
 ## Verification on device (installed PWA)
 
-- [x] Footer reads `v0.4.3` after **Apply update** and reload.
+- [x] Footer reads `v0.4.4` after **Apply update** and reload.
 - [x] Layout renders: top bar, player, track info, action row, sidebar, footer.
 - [x] Landscape: 16:9 player, sidebar right. Portrait: 4:3 player, sidebar below.
 - [x] No horizontal scroll at either orientation; document does not scroll.
@@ -111,7 +111,7 @@ Not device-verifiable here: no iPad available in this session.
 
 ## Device results (iPadOS 18.3, 2026-11-08)
 
-Passing: install/update with `v0.4.3`, full layout, 16:9 landscape and 4:3
+Passing: install/update with `v0.4.4`, full layout, 16:9 landscape and 4:3
 portrait, sidebar stacking, no horizontal scroll, safe-area clear, overlay
 toggle, disabled controls dimmed and inert, mid-playback switch stops the old
 file, AirPlay state, `scrollHeight / innerHeight` equal, precache back to 10.
@@ -160,3 +160,9 @@ platform reads outside diagnostics.
   the button is gated on that version instead of hidden on every iOS build.
 - MKV stays greyed: iPadOS has no public-movie UTI for it, and native decoding
   is M13 work. `accept="*/*"` would un-grey it but also expose every file.
+- Round 4: slider still dead on device with the lazy graph. Root causes hardened:
+  platform detection replaces the setter probe (iOS can report the write before
+  playback starts); the graph is now built and resumed from the Play tap or the
+  slider release, not from `track-changed`; diagnostics now print
+  `media volume / muted` and `audio graph ...`. If it still fails, the panel
+  distinguishes "no context" from "context suspended" from "gain present".

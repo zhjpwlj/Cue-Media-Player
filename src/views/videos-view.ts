@@ -74,7 +74,8 @@ export default class VideosView {
 
   // Session has no volume field in M3: volume is view state, mute is session state.
   #volume = 1;
-  #audioVolume = new AudioVolume();
+  #isIOS = isIOSDevice(navigator.userAgent, navigator.maxTouchPoints);
+  #audioVolume = new AudioVolume(this.#isIOS);
   #scrubbing = false;
 
   constructor({ broker, fileHandler, playlist, toasts, sessions }: VideosViewDeps) {
@@ -147,6 +148,14 @@ export default class VideosView {
       const session = this.#sessions.getActive();
       if (this.#volume > 0 && session.muted) session.muted = false;
       this.#applyVolume();
+      this.#audioVolume.prepare(this.#broker.getCurrentElement(session.id));
+    });
+    // Safari grants activation on touch release, not always during the drag.
+    this.#volumeSlider.addEventListener('change', () => {
+      this.#applyVolume();
+      this.#audioVolume.prepare(
+        this.#broker.getCurrentElement(this.#sessions.activeSessionId),
+      );
     });
 
     this.#volumeButton.addEventListener('click', () => {
@@ -160,9 +169,8 @@ export default class VideosView {
     });
 
     const ua = navigator.userAgent;
-    const isIOS = isIOSDevice(ua, navigator.maxTouchPoints);
     const hasDirectory = 'webkitdirectory' in document.createElement('input');
-    if (supportsDirectoryPicker(ua, hasDirectory, isIOS)) {
+    if (supportsDirectoryPicker(ua, hasDirectory, this.#isIOS)) {
       this.#folderButton.addEventListener('click', () => this.#fileHandler.openFolderPicker());
     } else {
       this.#folderButton.hidden = true;
@@ -271,7 +279,7 @@ export default class VideosView {
       return;
     }
     // Must happen inside the tap gesture or iOS keeps the audio context suspended.
-    this.#audioVolume.resume();
+    this.#audioVolume.prepare(this.#broker.getCurrentElement(session.id));
     void this.#broker
       .play(session.id)
       ?.catch(() => this.#toasts.show('Playback was blocked by the browser.'));

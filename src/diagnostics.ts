@@ -2,6 +2,8 @@
 // Open with five quick taps or a long press on the app header. Remove at M22
 // if the harness gains a real inspector; nothing here runs until opened.
 
+import { audioDiagnostics } from './core/audio-volume';
+
 declare global {
   interface Navigator {
     standalone?: boolean;
@@ -162,6 +164,11 @@ async function snapshot(): Promise<string[]> {
   add('innerHeight / visualViewport / 100dvh', `${innerHeight} / ${Math.round(window.visualViewport?.height ?? 0)} / ${dvh}`);
   add('scrollHeight / innerHeight', `${document.documentElement.scrollHeight} / ${innerHeight}`);
   add('safe-area t r b l', safeAreaInsets());
+  const media = document.querySelector<HTMLMediaElement>(
+    '#player-media-slot audio, #player-media-slot video',
+  );
+  add('media volume / muted', media ? `${media.volume} / ${media.muted}` : 'none');
+  add('audio graph', audioDiagnostics());
 
   await addStorage(add);
   await addServiceWorker(add);
