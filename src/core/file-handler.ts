@@ -4,8 +4,21 @@ import type PlaylistManager from './playlist-manager';
 
 export type TrackKind = 'audio' | 'video';
 
-const AUDIO_EXT = /\.(mp3|m4a|aac|wav|aif|aiff|flac|ogg|oga|opus)$/i;
-const VIDEO_EXT = /\.(mp4|m4v|mov|webm)$/i;
+const AUDIO_EXTS = ['mp3', 'm4a', 'aac', 'wav', 'aif', 'aiff', 'flac', 'ogg', 'oga', 'opus'] as const;
+const VIDEO_EXTS = ['mp4', 'm4v', 'mov', 'webm'] as const;
+// Extensions the picker offers but the player refuses until M13.
+const FUTURE_EXTS = ['mkv', 'avi'] as const;
+
+const AUDIO_EXT = new RegExp(`\\.(${AUDIO_EXTS.join('|')})$`, 'i');
+const VIDEO_EXT = new RegExp(`\\.(${VIDEO_EXTS.join('|')})$`, 'i');
+
+// iPadOS greys files out by UTI, not by MIME wildcard: `audio/*` alone left MP3
+// unselectable in Files. List every extension explicitly as well.
+export const PICKER_ACCEPT = [
+  'audio/*',
+  'video/*',
+  ...[...AUDIO_EXTS, ...VIDEO_EXTS, ...FUTURE_EXTS].map((ext) => `.${ext}`),
+].join(',');
 
 export function mediaKind(file: Pick<File, 'type' | 'name'>): TrackKind | null {
   if (file.type.startsWith('audio/')) return 'audio';
@@ -36,7 +49,7 @@ export default class FileHandler {
     return new Promise((resolve) => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = 'audio/*,video/*,.mkv,.avi';
+      input.accept = PICKER_ACCEPT;
       input.hidden = true;
       // iOS fires no event on cancel; the input is simply never heard from
       // again, so the promise also settles on the next task after focus returns.

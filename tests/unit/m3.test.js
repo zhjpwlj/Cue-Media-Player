@@ -168,3 +168,12 @@ test('openFolderPicker does nothing without webkitdirectory support', async () =
     globalThis.document = original;
   }
 });
+
+test('picker accept lists every native extension explicitly', async () => {
+  const { PICKER_ACCEPT } = await import('../../src/core/file-handler.ts');
+  for (const ext of ['.mp3', '.m4a', '.aac', '.wav', '.flac', '.ogg', '.mp4', '.mov', '.webm', '.mkv', '.avi']) {
+    assert.ok(PICKER_ACCEPT.includes(ext), `picker accept is missing ${ext}`);
+  }
+  assert.ok(PICKER_ACCEPT.includes('audio/*'));
+  assert.ok(PICKER_ACCEPT.includes('video/*'));
+});

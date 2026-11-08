@@ -81,7 +81,7 @@ Build: `npm run build` exit 0, 10 precached URLs, one CSS asset.
 
 ## Verification on device (installed PWA)
 
-- [x] Footer reads `v0.4.1` after **Apply update** and reload.
+- [x] Footer reads `v0.4.2` after **Apply update** and reload.
 - [x] Layout renders: top bar, player, track info, action row, sidebar, footer.
 - [x] Landscape: 16:9 player, sidebar right. Portrait: 4:3 player, sidebar below.
 - [x] No horizontal scroll at either orientation; document does not scroll.
@@ -111,7 +111,7 @@ Not device-verifiable here: no iPad available in this session.
 
 ## Device results (iPadOS 18.3, 2026-11-08)
 
-Passing: install/update with `v0.4.1`, full layout, 16:9 landscape and 4:3
+Passing: install/update with `v0.4.2`, full layout, 16:9 landscape and 4:3
 portrait, sidebar stacking, no horizontal scroll, safe-area clear, overlay
 toggle, disabled controls dimmed and inert, mid-playback switch stops the old
 file, AirPlay state, `scrollHeight / innerHeight` equal, precache back to 10.
@@ -136,9 +136,11 @@ Failing, with root cause:
    `audio/*,video/*`, so Files greyed MKV/AVI out. Fixed: `.mkv,.avi` added to
    `accept`; they are now selectable and produce the existing "not supported
    yet" toast. Native decoding is M13's job.
-5. **MP3 selection reported broken.** Not yet diagnosed; needs the symptom
-   (name update? toast? silence on play?) before changing code. MKV/AVI now
-   at least fail with a message, which isolates the remaining report.
+5. **MP3 not selectable.** iPadOS Files greys files by UTI, not by the MIME
+   wildcard: `accept="audio/*,video/*"` left MP3 unselectable. Fixed: the accept
+   list now names every extension explicitly (built from the same tables as
+   `mediaKind`), so MP3/M4A/FLAC/OGG/MP4/MOV/WebM select normally; MKV/AVI are
+   selectable and fail with the "not supported yet" toast until M13.
 
 Note: `isIOS()` reads `navigator.userAgent` in the view; the M23 platform
 module replaces it. Until then this is the only UA read outside diagnostics.
