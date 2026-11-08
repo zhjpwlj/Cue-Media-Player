@@ -109,6 +109,11 @@
   pointer-events: none;
 }
 
+/* One disabled look for every milestone-gated control. */
+button:disabled {
+  opacity: 0.4;
+}
+
 #seek-bar {
   flex: 1;
   min-width: 0;
@@ -195,7 +200,10 @@
 }
 
 @media (max-width: 520px) {
-  #volume-slider {
+  #volume-slider,
+  #btn-subtitles,
+  #btn-pip,
+  #btn-fullscreen {
     display: none;
   }
 

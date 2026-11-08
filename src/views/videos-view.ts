@@ -69,6 +69,7 @@ export default class VideosView {
 
   // Session has no volume field in M3: volume is view state, mute is session state.
   #volume = 1;
+  #scrubbing = false;
 
   constructor({ broker, fileHandler, playlist, toasts, sessions }: VideosViewDeps) {
     this.#broker = broker;
@@ -125,7 +126,15 @@ export default class VideosView {
     });
 
     this.#playPause.addEventListener('click', () => this.#togglePlay());
-    this.#seekBar.addEventListener('input', () => this.#seekToSlider());
+    this.#seekBar.addEventListener('input', () => {
+      // Ignore timeupdate while the finger is on the bar, or the thumb fights back.
+      this.#scrubbing = true;
+      this.#seekToSlider();
+    });
+    this.#seekBar.addEventListener('change', () => {
+      this.#scrubbing = false;
+      this.#seekToSlider();
+    });
 
     this.#volumeSlider.addEventListener('input', () => {
       this.#volume = Number(this.#volumeSlider.value);
@@ -234,6 +243,7 @@ export default class VideosView {
   }
 
   #onTimeUpdate(detail: TimeUpdateDetail): void {
+    if (this.#scrubbing) return;
     const fraction = detail.duration > 0 ? detail.currentTime / detail.duration : 0;
     this.#seekBar.value = String(Math.round(Math.min(1, Math.max(0, fraction)) * 1000));
     this.#timeDisplay.textContent = `${formatTime(detail.currentTime)} / ${formatTime(detail.duration)}`;
