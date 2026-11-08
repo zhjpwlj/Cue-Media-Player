@@ -1,3 +1,4 @@
+import AudioVolume from '../core/audio-volume';
 import { mediaKind } from '../core/file-handler';
 import type FileHandler from '../core/file-handler';
 import type PlaylistManager from '../core/playlist-manager';
@@ -6,6 +7,7 @@ import type { PlayerState, Track } from '../core/player-broker';
 import type SessionManager from '../core/session-manager';
 import type { Session } from '../core/session-manager';
 import type Toasts from '../ui/toasts';
+import { isIOSDevice, supportsDirectoryPicker } from '../utils/platform';
 import { formatTime } from '../utils/time';
 
 interface VideosViewDeps {
@@ -37,14 +39,8 @@ interface PlaylistUpdatedDetail {
   sessionId: string;
 }
 
-// iPadOS reports itself as a Mac with touch; iPhone/iPad lack the folder picker
-// and ignore programmatic volume. The M23 platform module owns this properly.
-function isIOS(): boolean {
-  return (
-    /iP(hone|ad|od)/.test(navigator.userAgent) ||
-    (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent))
-  );
-}
+// iPadOS reports itself as a Mac with touch. Folder selection needs Safari
+// 18.4+ there; programmatic volume is always ignored. M23 owns this properly.
 
 type AirPlayElement = HTMLMediaElement & {
   webkitShowPlaybackTargetPicker?: () => void;
@@ -78,6 +74,7 @@ export default class VideosView {
 
   // Session has no volume field in M3: volume is view state, mute is session state.
   #volume = 1;
+  #audioVolume = new AudioVolume();
   #scrubbing = false;
 
   constructor({ broker, fileHandler, playlist, toasts, sessions }: VideosViewDeps) {
@@ -162,15 +159,15 @@ export default class VideosView {
       void this.#open();
     });
 
-    if (!isIOS() && 'webkitdirectory' in document.createElement('input')) {
+    const ua = navigator.userAgent;
+    const isIOS = isIOSDevice(ua, navigator.maxTouchPoints);
+    const hasDirectory = 'webkitdirectory' in document.createElement('input');
+    if (supportsDirectoryPicker(ua, hasDirectory, isIOS)) {
       this.#folderButton.addEventListener('click', () => this.#fileHandler.openFolderPicker());
     } else {
       this.#folderButton.hidden = true;
       this.#folderButton.title = 'Folder selection is unavailable in this browser';
     }
-
-    // iOS ignores HTMLMediaElement.volume; only mute is honored. Hide the dead slider.
-    if (isIOS()) this.#volumeSlider.hidden = true;
 
     this.#airplayButton.addEventListener('click', () => {
       const el = this.#broker.getCurrentElement(this.#sessions.activeSessionId) as AirPlayElement | null;
@@ -273,6 +270,8 @@ export default class VideosView {
       this.#broker.pause(session.id);
       return;
     }
+    // Must happen inside the tap gesture or iOS keeps the audio context suspended.
+    this.#audioVolume.resume();
     void this.#broker
       .play(session.id)
       ?.catch(() => this.#toasts.show('Playback was blocked by the browser.'));
@@ -287,11 +286,9 @@ export default class VideosView {
 
   #applyVolume(): void {
     const session = this.#sessions.getActive();
+    this.#audioVolume.apply(this.#broker.getCurrentElement(session.id), this.#volume);
     const el = this.#broker.getCurrentElement(session.id);
-    if (el) {
-      el.volume = this.#volume;
-      el.muted = session.muted;
-    }
+    if (el) el.muted = session.muted;
     this.#volumeSlider.value = String(this.#volume);
     this.#volumeButton.textContent = session.muted ? '🔇' : '🔊';
     this.#volumeButton.setAttribute('aria-label', session.muted ? 'Unmute' : 'Mute');

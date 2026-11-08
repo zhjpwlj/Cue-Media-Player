@@ -81,7 +81,7 @@ Build: `npm run build` exit 0, 10 precached URLs, one CSS asset.
 
 ## Verification on device (installed PWA)
 
-- [x] Footer reads `v0.4.2` after **Apply update** and reload.
+- [x] Footer reads `v0.4.3` after **Apply update** and reload.
 - [x] Layout renders: top bar, player, track info, action row, sidebar, footer.
 - [x] Landscape: 16:9 player, sidebar right. Portrait: 4:3 player, sidebar below.
 - [x] No horizontal scroll at either orientation; document does not scroll.
@@ -111,7 +111,7 @@ Not device-verifiable here: no iPad available in this session.
 
 ## Device results (iPadOS 18.3, 2026-11-08)
 
-Passing: install/update with `v0.4.2`, full layout, 16:9 landscape and 4:3
+Passing: install/update with `v0.4.3`, full layout, 16:9 landscape and 4:3
 portrait, sidebar stacking, no horizontal scroll, safe-area clear, overlay
 toggle, disabled controls dimmed and inert, mid-playback switch stops the old
 file, AirPlay state, `scrollHeight / innerHeight` equal, precache back to 10.
@@ -125,13 +125,16 @@ Failing, with root cause:
    the diagnostics trigger).
 2. **Volume slider dead.** iOS Safari ignores programmatic
    `HTMLMediaElement.volume`; only `muted` is honored (mute worked on device).
-   Fixed: the slider hides on iOS/iPadOS instead of pretending to work. Real
-   volume control on iOS is hardware-only; revisit if M23 finds a supported
-   path.
+   Fixed: `AudioVolume` routes the element through
+   `AudioContext.createMediaElementSource → GainNode → destination`, the same
+   path Essential Media Player uses. The graph is built only on the first slider
+   move, so normal playback keeps the native path (AirPlay, background audio).
+   The slider is visible again on iOS.
 3. **Folder picker cannot pick folders.** iPadOS exposes `webkitdirectory` on
-   the input, so feature detection passed, but its document picker offers no
-   folder selection. Fixed: the folder button hides on iOS/iPadOS; folder
-   import returns on desktop Chromium (M24 / M27) via `showDirectoryPicker`.
+   the input long before the picker honors it; real directory selection arrived
+   with Safari 18.4 (WebKit bug 271705). Fixed: the button is shown only on
+   non-iOS or iOS 18.4+; on 18.3 it hides as before. Folder import still gains
+   `showDirectoryPicker` on desktop Chromium later (M24 / M27).
 4. **MKV not selectable.** The picker's `accept` list offered only
    `audio/*,video/*`, so Files greyed MKV/AVI out. Fixed: `.mkv,.avi` added to
    `accept`; they are now selectable and produce the existing "not supported
@@ -142,5 +145,18 @@ Failing, with root cause:
    `mediaKind`), so MP3/M4A/FLAC/OGG/MP4/MOV/WebM select normally; MKV/AVI are
    selectable and fail with the "not supported yet" toast until M13.
 
-Note: `isIOS()` reads `navigator.userAgent` in the view; the M23 platform
-module replaces it. Until then this is the only UA read outside diagnostics.
+Note: `src/utils/platform.ts` reads `navigator.userAgent` (and
+`navigator.maxTouchPoints`) for the iOS gate, and `AudioVolume` probes the media
+setter. The M23 platform module replaces both. Until then these are the only
+platform reads outside diagnostics.
+
+## Round 3 (2026-11-08)
+
+- MP3 now selectable and plays (explicit extension accept).
+- Volume: verified that the reference site (essentialmediaplayer.com) routes
+  media through `createMediaElementSource` + `GainNode`; Cue now does the same,
+  lazily, so iOS gets a working slider.
+- Folder: verified iPadOS supports directory picking only from Safari 18.4;
+  the button is gated on that version instead of hidden on every iOS build.
+- MKV stays greyed: iPadOS has no public-movie UTI for it, and native decoding
+  is M13 work. `accept="*/*"` would un-grey it but also expose every file.
