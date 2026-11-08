@@ -36,7 +36,7 @@ export default class FileHandler {
     return new Promise((resolve) => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = 'audio/*,video/*';
+      input.accept = 'audio/*,video/*,.mkv,.avi';
       input.hidden = true;
       // iOS fires no event on cancel; the input is simply never heard from
       // again, so the promise also settles on the next task after focus returns.

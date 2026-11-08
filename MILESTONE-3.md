@@ -81,25 +81,25 @@ Build: `npm run build` exit 0, 10 precached URLs, one CSS asset.
 
 ## Verification on device (installed PWA)
 
-- [ ] Footer reads `v0.4.0` after **Apply update** and reload.
-- [ ] Layout renders: top bar, player, track info, action row, sidebar, footer.
-- [ ] Landscape: 16:9 player, sidebar right. Portrait: 4:3 player, sidebar below.
-- [ ] No horizontal scroll at either orientation; document does not scroll.
-- [ ] Safe-area: nothing under the status bar or home indicator.
-- [ ] Controls overlay is visible on open; tapping the player hides/shows it.
-- [ ] Disabled buttons (menu, theme, prev/next, CC, PiP, fullscreen, favorite)
+- [x] Footer reads `v0.4.1` after **Apply update** and reload.
+- [x] Layout renders: top bar, player, track info, action row, sidebar, footer.
+- [x] Landscape: 16:9 player, sidebar right. Portrait: 4:3 player, sidebar below.
+- [x] No horizontal scroll at either orientation; document does not scroll.
+- [x] Safe-area: nothing under the status bar or home indicator.
+- [x] Controls overlay is visible on open; tapping the player hides/shows it.
+- [x] Disabled buttons (menu, theme, prev/next, CC, PiP, fullscreen, favorite)
       look dimmed and do nothing when tapped.
-- [ ] **Select file** plays audio and video; name, badge, time line update.
-- [ ] Play/pause, seek drag, volume slider and mute work.
+- [ ] **Select file** plays audio and video; name, badge, time line update. Note: audio selection does not work (mp3), some video formats are unselectable (mkv)
+- [ ] Play/pause, seek drag, volume slider and mute work. Note: volume slider does not work, but mute works.
 - [ ] Switching MP4 → MP3 keeps one visible control set; volume and mute carry
       over; no double audio.
-- [ ] **Select folder** opens the iPad folder picker; only media files appear
-      as tracks; non-media are filtered out.
-- [ ] Selecting a new file mid-playback stops the old one; no autoplay.
-- [ ] AirPlay button is enabled when a media element exists (Safari), or dimmed
+- [ ] **Select folder** opens the iPad folder picker; only media files appear 
+      as tracks; non-media are filtered out. Note: cannot select folders.
+- [x] Selecting a new file mid-playback stops the old one; no autoplay.
+- [x] AirPlay button is enabled when a media element exists (Safari), or dimmed
       with its tooltip elsewhere.
-- [ ] `scrollHeight / innerHeight` still equal in the diagnostics panel.
-- [ ] Precache returns to `10` after applying the update.
+- [x] `scrollHeight / innerHeight` still equal in the diagnostics panel.
+- [x] Precache returns to `10` after applying the update.
 
 Not device-verifiable here: no iPad available in this session.
 
@@ -108,3 +108,37 @@ Not device-verifiable here: no iPad available in this session.
 - Queue, `next`/`prev`, auto-advance, folder import of all files — M4.
 - Fullscreen, PiP — M7. Themes — M8. Sessions/tabs — M9. Subtitles — M11.
 - Format conversion — M13+.
+
+## Device results (iPadOS 18.3, 2026-11-08)
+
+Passing: install/update with `v0.4.1`, full layout, 16:9 landscape and 4:3
+portrait, sidebar stacking, no horizontal scroll, safe-area clear, overlay
+toggle, disabled controls dimmed and inert, mid-playback switch stops the old
+file, AirPlay state, `scrollHeight / innerHeight` equal, precache back to 10.
+
+Failing, with root cause:
+
+1. **Top-bar text selectable (regression).** M3 renamed the header element to
+   `.top-bar`, but `base.css` still targeted `.app-header`, so
+   `user-select: none` and `touch-action: manipulation` no longer applied.
+   Fixed: the base rule now targets `.top-bar` (id `app-header` unchanged for
+   the diagnostics trigger).
+2. **Volume slider dead.** iOS Safari ignores programmatic
+   `HTMLMediaElement.volume`; only `muted` is honored (mute worked on device).
+   Fixed: the slider hides on iOS/iPadOS instead of pretending to work. Real
+   volume control on iOS is hardware-only; revisit if M23 finds a supported
+   path.
+3. **Folder picker cannot pick folders.** iPadOS exposes `webkitdirectory` on
+   the input, so feature detection passed, but its document picker offers no
+   folder selection. Fixed: the folder button hides on iOS/iPadOS; folder
+   import returns on desktop Chromium (M24 / M27) via `showDirectoryPicker`.
+4. **MKV not selectable.** The picker's `accept` list offered only
+   `audio/*,video/*`, so Files greyed MKV/AVI out. Fixed: `.mkv,.avi` added to
+   `accept`; they are now selectable and produce the existing "not supported
+   yet" toast. Native decoding is M13's job.
+5. **MP3 selection reported broken.** Not yet diagnosed; needs the symptom
+   (name update? toast? silence on play?) before changing code. MKV/AVI now
+   at least fail with a message, which isolates the remaining report.
+
+Note: `isIOS()` reads `navigator.userAgent` in the view; the M23 platform
+module replaces it. Until then this is the only UA read outside diagnostics.

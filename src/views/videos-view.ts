@@ -37,6 +37,15 @@ interface PlaylistUpdatedDetail {
   sessionId: string;
 }
 
+// iPadOS reports itself as a Mac with touch; iPhone/iPad lack the folder picker
+// and ignore programmatic volume. The M23 platform module owns this properly.
+function isIOS(): boolean {
+  return (
+    /iP(hone|ad|od)/.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent))
+  );
+}
+
 type AirPlayElement = HTMLMediaElement & {
   webkitShowPlaybackTargetPicker?: () => void;
 };
@@ -153,12 +162,15 @@ export default class VideosView {
       void this.#open();
     });
 
-    if ('webkitdirectory' in document.createElement('input')) {
+    if (!isIOS() && 'webkitdirectory' in document.createElement('input')) {
       this.#folderButton.addEventListener('click', () => this.#fileHandler.openFolderPicker());
     } else {
       this.#folderButton.hidden = true;
       this.#folderButton.title = 'Folder selection is unavailable in this browser';
     }
+
+    // iOS ignores HTMLMediaElement.volume; only mute is honored. Hide the dead slider.
+    if (isIOS()) this.#volumeSlider.hidden = true;
 
     this.#airplayButton.addEventListener('click', () => {
       const el = this.#broker.getCurrentElement(this.#sessions.activeSessionId) as AirPlayElement | null;
