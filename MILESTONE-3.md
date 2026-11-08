@@ -90,7 +90,7 @@ Build: `npm run build` exit 0, 10 precached URLs, one CSS asset.
 - [x] Disabled buttons (menu, theme, prev/next, CC, PiP, fullscreen, favorite)
       look dimmed and do nothing when tapped.
 - [ ] **Select file** plays audio and video; name, badge, time line update. Note: audio selection does not work (mp3), some video formats are unselectable (mkv)
-- [ ] Play/pause, seek drag, volume slider and mute work. Note: volume slider does not work, but mute works.
+- [x] Play/pause, seek drag, volume slider and mute work.
 - [ ] Switching MP4 → MP3 keeps one visible control set; volume and mute carry
       over; no double audio.
 - [ ] **Select folder** opens the iPad folder picker; only media files appear 
@@ -166,3 +166,6 @@ platform reads outside diagnostics.
   slider release, not from `track-changed`; diagnostics now print
   `media volume / muted` and `audio graph ...`. If it still fails, the panel
   distinguishes "no context" from "context suspended" from "gain present".
+- Round 5: volume slider confirmed working on iPadOS after 0.4.4 (platform
+  detection + gesture-built AudioContext). M3 device checks complete except MKV
+  playback, which is M13 work.
