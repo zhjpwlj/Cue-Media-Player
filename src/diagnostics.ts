@@ -2,6 +2,7 @@
 // Open with five quick taps or a long press on the app header. Remove at M22
 // if the harness gains a real inspector; nothing here runs until opened.
 
+import { clearDebugLog, debugLogging, debugLogLines, setDebugLogging } from './utils/debug.ts';
 import { audioDiagnostics } from './core/audio-volume';
 import { blobUrlDiagnostics } from './core/player-broker';
 
@@ -112,13 +113,26 @@ function togglePanel(): void {
 
   bar.append(title, copy, close);
   void addUpdateButton(bar);
+
+  const refresh = (): void => {
+    void snapshot().then((lines) => {
+      if (root.isConnected) pre.textContent = lines.join('\n');
+    });
+  };
+  const debugButton = makeButton(debugLogging() ? 'Debug: on' : 'Debug: off', () => {
+    const next = !debugLogging();
+    setDebugLogging(next);
+    if (!next) clearDebugLog();
+    debugButton.textContent = next ? 'Debug: on' : 'Debug: off';
+    refresh();
+  });
+  bar.insertBefore(debugButton, close);
+
   root.append(bar, pre);
   document.body.append(root);
   close.focus();
 
-  snapshot().then((lines) => {
-    if (root.isConnected) pre.textContent = lines.join('\n');
-  });
+  refresh();
 }
 
 function makeButton(label: string, onClick: () => void): HTMLButtonElement {
@@ -183,6 +197,11 @@ async function snapshot(): Promise<string[]> {
   await addCaches(add);
 
   add('userAgent', navigator.userAgent);
+  const debugLines = debugLogLines();
+  if (debugLines.length > 0) {
+    add('debug log (newest last)', '');
+    for (const line of debugLines) add('debug', line);
+  }
   return lines;
 }
 

@@ -1,6 +1,7 @@
 import type PlayerBroker from './player-broker';
 import type SessionManager from './session-manager';
 import type { Session } from './session-manager';
+import { debug } from '../utils/debug.ts';
 
 type MediaSessionBroker = Pick<PlayerBroker, 'play' | 'pause' | 'getState'>;
 type NavigationTarget = { next(): void; prev(): void };
@@ -108,6 +109,7 @@ export default class MediaSessionController {
       init.artwork = [{ src: artwork, sizes: '512x512', type: 'image/png' }];
     }
     navigator.mediaSession.metadata = new MediaMetadata(init);
+    debug('mediaSession', 'metadata updated to', track.name);
   }
 
   /** Placeholder cover; iOS hides the widget when artwork is missing. */

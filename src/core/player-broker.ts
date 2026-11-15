@@ -4,6 +4,8 @@
  *
  * Invariant: every src-clear is followed by revoking the previous blob URL.
  */
+import { debug } from '../utils/debug.ts';
+
 export type TrackKind = 'audio' | 'video';
 
 export interface Track {
@@ -59,6 +61,7 @@ export default class PlayerBroker {
     const rec = this.#record(sessionId);
     const kind: TrackKind = track.type === 'video' ? 'video' : 'audio';
     const loadId = ++rec.loadId;
+    debug('broker', 'loadTrack started for', track.name);
     this.#setState(sessionId, 'loading');
 
     // Step 3: every element not being loaded this round is released.
@@ -111,6 +114,7 @@ export default class PlayerBroker {
     rec.lastGood = { track, file };
     this.#setState(sessionId, 'paused');
     dispatch('track-changed', { sessionId, track });
+    debug('broker', 'track-changed emitted for', track.name);
     return element;
   }
 
@@ -302,6 +306,7 @@ export default class PlayerBroker {
   }
 
   #emitTrackEnded(sessionId: string): void {
+    debug('broker', 'track-ended emitted for session', sessionId);
     dispatch('track-ended', { sessionId });
   }
 

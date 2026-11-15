@@ -2,6 +2,7 @@ import { mediaKind } from './file-handler.ts';
 import type PlayerBroker from './player-broker';
 import type { Track } from './player-broker';
 import type SessionManager from './session-manager';
+import { debug } from '../utils/debug.ts';
 
 type PlaylistBroker = Pick<
   PlayerBroker,
@@ -94,6 +95,7 @@ export default class PlaylistManager {
     }
 
     session.currentIndex = index;
+    debug('playlist', 'advancing to index', index, track.name);
     try {
       await this.#broker.loadTrack(session.id, track, file);
     } catch {
