@@ -7,6 +7,16 @@
 import { debug } from '../utils/debug.ts';
 
 export type TrackKind = 'audio' | 'video';
+export type FullscreenMode = 'simulated' | 'native';
+
+/** iOS exposes the WebKit-prefixed fullscreen and PiP entry points. */
+type FullscreenElement = HTMLMediaElement & {
+  webkitEnterFullscreen?: () => void;
+  webkitExitFullscreen?: () => void;
+  webkitDisplayingFullscreen?: boolean;
+  requestPictureInPicture?: () => Promise<unknown>;
+  webkitSetPresentationMode?: (mode: 'picture-in-picture' | 'inline' | 'fullscreen') => void;
+};
 
 export interface Track {
   id: string;
@@ -48,9 +58,98 @@ export default class PlayerBroker {
   #lastTime = new WeakMap<HTMLMediaElement, number>();
   #createdUrls = 0;
   #revokedUrls = 0;
+  #simulatedFs: string | null = null;
+  #fullscreenMode: (() => FullscreenMode) | null;
 
-  constructor() {
+  constructor(getFullscreenMode?: () => FullscreenMode) {
     latestBroker = this;
+    this.#fullscreenMode = getFullscreenMode ?? null;
+    document.addEventListener?.('keydown', (event) => {
+      if (event.key !== 'Escape' || !this.#simulatedFs) return;
+      // A modal must not close at the same time as fullscreen.
+      event.stopPropagation();
+      this.exitFullscreen(this.#simulatedFs);
+    });
+  }
+
+  get simulatedFsActive(): string | null {
+    return this.#simulatedFs;
+  }
+
+  /**
+   * Simulated mode is pure CSS: the player container is promoted to a fixed
+   * viewport layer. Native mode hands the element to the platform player.
+   */
+  async enterFullscreen(sessionId: string): Promise<void> {
+    const mode = this.#fullscreenMode?.() ?? 'simulated';
+    if (mode === 'native') {
+      await this.#enterNativeFullscreen(sessionId);
+      return;
+    }
+    document.body.classList.add('simulated-fs-active');
+    document.getElementById('player-container')?.classList.add('fs-root');
+    this.#simulatedFs = sessionId;
+    dispatch('fullscreen-changed', { sessionId, active: true, mode: 'simulated' });
+  }
+
+  exitFullscreen(sessionId: string): void {
+    document.body.classList.remove('simulated-fs-active');
+    document.getElementById('player-container')?.classList.remove('fs-root');
+    if (this.#simulatedFs) {
+      this.#simulatedFs = null;
+      dispatch('fullscreen-changed', { sessionId, active: false, mode: 'simulated' });
+    }
+    const el = this.getCurrentElement(sessionId) as FullscreenElement | null;
+    if (el?.webkitDisplayingFullscreen) el.webkitExitFullscreen?.();
+    if (document.fullscreenElement) void document.exitFullscreen?.();
+  }
+
+  /** PiP is video-only; entering it leaves simulated fullscreen first. */
+  async enterPiP(sessionId: string): Promise<boolean> {
+    const el = this.getCurrentElement(sessionId) as FullscreenElement | null;
+    if (!el || el.tagName !== 'VIDEO') return false;
+    if (this.#simulatedFs) this.exitFullscreen(this.#simulatedFs);
+
+    // Safari/iPadOS expose PiP through the presentation-mode setter only.
+    if (typeof el.webkitSetPresentationMode === 'function') {
+      el.webkitSetPresentationMode('picture-in-picture');
+      return true;
+    }
+    if (typeof el.requestPictureInPicture !== 'function') return false;
+    try {
+      await el.requestPictureInPicture();
+      return true;
+    } catch (err) {
+      // Rejects when the video is not loaded or the platform disabled PiP.
+      debug('broker', 'PiP failed', err);
+      return false;
+    }
+  }
+
+  /** True when this element can enter picture in picture on this platform. */
+  supportsPiP(sessionId: string): boolean {
+    const el = this.getCurrentElement(sessionId) as FullscreenElement | null;
+    if (!el || el.tagName !== 'VIDEO') return false;
+    return (
+      typeof el.webkitSetPresentationMode === 'function' ||
+      typeof el.requestPictureInPicture === 'function'
+    );
+  }
+
+  async #enterNativeFullscreen(sessionId: string): Promise<void> {
+    const el = this.getCurrentElement(sessionId) as FullscreenElement | null;
+    if (!el) return;
+    if (typeof el.webkitEnterFullscreen === 'function') {
+      el.webkitEnterFullscreen();
+      return;
+    }
+    if (typeof el.requestFullscreen === 'function') {
+      try {
+        await el.requestFullscreen();
+      } catch (err) {
+        debug('broker', 'native fullscreen failed', err);
+      }
+    }
   }
 
   async loadTrack(
@@ -60,6 +159,8 @@ export default class PlayerBroker {
   ): Promise<HTMLMediaElement | null> {
     const rec = this.#record(sessionId);
     const kind: TrackKind = track.type === 'video' ? 'video' : 'audio';
+    // Simulated fullscreen has nothing to show for audio; drop back to the view.
+    if (kind === 'audio' && this.#simulatedFs === sessionId) this.exitFullscreen(sessionId);
     const loadId = ++rec.loadId;
     debug('broker', 'loadTrack started for', track.name);
     this.#setState(sessionId, 'loading');

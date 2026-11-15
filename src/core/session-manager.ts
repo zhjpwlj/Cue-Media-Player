@@ -13,6 +13,7 @@ export interface Session {
   videoThemeId: string;
   audioThemeId: string;
   activeView: 'videos' | 'shorts';
+  fullscreenMode: 'simulated' | 'native';
   playlist: Track[];
   currentIndex: number;
   currentTime: number;
@@ -40,6 +41,7 @@ export default class SessionManager {
       videoThemeId: 'custom',
       audioThemeId: 'custom',
       activeView: 'videos',
+      fullscreenMode: 'simulated',
       playlist: [],
       currentIndex: -1,
       currentTime: 0,

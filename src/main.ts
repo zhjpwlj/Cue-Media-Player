@@ -8,6 +8,7 @@ import PlayerBroker from './core/player-broker';
 import FileHandler from './core/file-handler';
 import PlaylistManager from './core/playlist-manager';
 import SessionManager from './core/session-manager';
+import SettingsModal from './ui/settings-modal';
 import Toasts from './ui/toasts';
 import VideosView from './views/videos-view';
 
@@ -27,7 +28,7 @@ async function start(): Promise<void> {
   try {
     const sessions = new SessionManager();
     await sessions.init();
-    const broker = new PlayerBroker();
+    const broker = new PlayerBroker(() => sessions.getActive().fullscreenMode);
     const playlist = new PlaylistManager(sessions, broker);
     const playlistRegistry = new Map<string, PlaylistManager>();
     playlistRegistry.set(sessions.activeSessionId, playlist);
@@ -40,6 +41,11 @@ async function start(): Promise<void> {
       toasts,
       sessions,
     }).mount(document.querySelector<HTMLElement>('.app-main')!);
+
+    new SettingsModal(
+      sessions,
+      document.querySelector<HTMLButtonElement>('#btn-settings') ?? undefined,
+    ).mount();
   } catch {
     toasts.show('Cue failed to start.');
   }

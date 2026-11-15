@@ -48,10 +48,21 @@ test('videos layout DOM exposes required controls', () => {
   // Touch has no hover: the overlay starts visible.
   assert.match(html, /id="player-container"[^>]*class="[^"]*show-controls/);
   // Future-milestone controls must not be silently inert.
-  for (const id of ['btn-menu', 'btn-theme', 'btn-subtitles', 'btn-pip', 'btn-fullscreen']) {
+  for (const id of ['btn-menu', 'btn-theme', 'btn-subtitles']) {
     const tag = html.match(new RegExp(`<button[^>]*id="${id}"[^>]*>`))?.[0] ?? '';
     assert.ok(tag.includes('disabled'), `${id} must be disabled`);
     assert.ok(tag.includes('title='), `${id} must explain when it is enabled`);
+  }
+  // M7 enabled fullscreen and PiP; they ship hidden until a video loads.
+  for (const id of ['btn-fullscreen', 'btn-pip']) {
+    const tag = html.match(new RegExp(`<button[^>]*id="${id}"[^>]*>`))?.[0] ?? '';
+    assert.ok(!tag.includes('disabled'), `${id} must be enabled in M7`);
+    assert.ok(tag.includes('hidden'), `${id} must start hidden (no video yet)`);
+    assert.ok(tag.includes('aria-label='), `${id} needs a label`);
+  }
+  // M7 settings sheet owns the fullscreen-mode toggle.
+  for (const id of ['btn-settings', 'settings-modal', 'pref-simulated-fs', 'btn-settings-close']) {
+    assert.ok(html.includes(`id="${id}"`), `missing #${id}`);
   }
   // M4 enabled these; they must carry a label instead of a milestone tooltip.
   for (const id of ['btn-prev', 'btn-next']) {
@@ -66,4 +77,14 @@ test('layout CSS never uses 100vh and keeps safe-area off the view', () => {
   assert.ok(!/\b100vh\b/.test(css));
   assert.ok(!/safe-area-inset/.test(css), 'safe-area belongs to body');
   assert.ok(!/100dvh/.test(css), 'view must not claim viewport height');
+});
+
+test('simulated fullscreen insets the controls, not the video', () => {
+  const css = read('src/css/components.css');
+  assert.match(css, /body\.simulated-fs-active #player-container \{[^}]*100dvh/s);
+  assert.match(
+    css,
+    /body\.simulated-fs-active #controls-overlay \{[^}]*safe-area-inset-bottom/s,
+    'fullscreen controls must clear the home indicator',
+  );
 });

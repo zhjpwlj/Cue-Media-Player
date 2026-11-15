@@ -73,6 +73,8 @@ export default class VideosView {
   #playlistItems!: HTMLElement;
   #airplayButton!: HTMLButtonElement;
   #folderButton!: HTMLButtonElement;
+  #fullscreenButton!: HTMLButtonElement;
+  #pipButton!: HTMLButtonElement;
 
   // Session has no volume field in M3: volume is view state, mute is session state.
   #volume = 1;
@@ -104,6 +106,8 @@ export default class VideosView {
     this.#playlistItems = this.#el('playlist-items');
     this.#airplayButton = this.#el<HTMLButtonElement>('btn-airplay');
     this.#folderButton = this.#el<HTMLButtonElement>('btn-select-folder');
+    this.#fullscreenButton = this.#el<HTMLButtonElement>('btn-fullscreen');
+    this.#pipButton = this.#el<HTMLButtonElement>('btn-pip');
 
     this.#broker.attachTo(this.#sessions.activeSessionId, this.#mediaSlot);
     this.#bindControls();
@@ -195,6 +199,21 @@ export default class VideosView {
     this.#el<HTMLButtonElement>('btn-info').addEventListener('click', () => {
       this.#toasts.show('Track details arrive with metadata extraction (M11).');
     });
+
+    this.#fullscreenButton.addEventListener('click', () => {
+      const sessionId = this.#sessions.activeSessionId;
+      if (this.#broker.simulatedFsActive) {
+        this.#broker.exitFullscreen(sessionId);
+        return;
+      }
+      void this.#broker.enterFullscreen(sessionId);
+    });
+
+    this.#pipButton.addEventListener('click', () => {
+      void this.#broker.enterPiP(this.#sessions.activeSessionId).then((entered) => {
+        if (!entered) this.#toasts.show('Picture in picture is unavailable for this video.');
+      });
+    });
   }
 
   #bindDocumentEvents(): void {
@@ -226,6 +245,16 @@ export default class VideosView {
       const detail = (event as CustomEvent<PlaylistUpdatedDetail>).detail;
       if (!this.#isActive(detail.sessionId)) return;
       this.onPlaylistUpdated();
+    });
+
+    document.addEventListener('fullscreen-changed', (event) => {
+      const detail = (event as CustomEvent<{ sessionId: string; active: boolean }>).detail;
+      if (!this.#isActive(detail.sessionId)) return;
+      this.#fullscreenButton.textContent = detail.active ? '⤢' : '⛶';
+      this.#fullscreenButton.setAttribute(
+        'aria-label',
+        detail.active ? 'Exit fullscreen' : 'Fullscreen',
+      );
     });
   }
 
@@ -262,6 +291,7 @@ export default class VideosView {
     this.#timeDisplay.textContent = '0:00 / 0:00';
     this.#applyVolume();
     this.#refreshAirplay();
+    this.#refreshDisplayButtons(detail.track.type);
   }
 
   #onTimeUpdate(detail: TimeUpdateDetail): void {
@@ -307,8 +337,17 @@ export default class VideosView {
     this.#volumeButton.setAttribute('aria-label', session.muted ? 'Unmute' : 'Mute');
   }
 
-  #refreshAirplay(): void {
-    const el = this.#broker.getCurrentElement(this.#sessions.activeSessionId) as AirPlayElement | null;
+  /**
+   * Fullscreen and PiP are meaningless for audio: the element has no picture
+   * and native fullscreen is unavailable. Hide rather than disable, per M7.
+   */
+  #refreshDisplayButtons(kind: Track['type']): void {
+    const isVideo = kind === 'video';
+    this.#fullscreenButton.hidden = !isVideo;
+    this.#pipButton.hidden = !isVideo || !this.#broker.supportsPiP(this.#sessions.activeSessionId);
+  }
+
+  #refreshAirplay(): void {    const el = this.#broker.getCurrentElement(this.#sessions.activeSessionId) as AirPlayElement | null;
     if (typeof el?.webkitShowPlaybackTargetPicker !== 'function') {
       this.#airplayButton.disabled = true;
       this.#airplayButton.setAttribute('aria-disabled', 'true');
