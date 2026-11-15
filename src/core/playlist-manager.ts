@@ -70,6 +70,7 @@ export default class PlaylistManager {
     const session = this.#sessions.getActive();
     session.playlist = tracks;
     session.currentIndex = 0;
+    debug('playlist', 'queued', tracks.length, 'tracks');
     document.dispatchEvent(
       new CustomEvent('playlist-updated', { detail: { sessionId: session.id } }),
     );

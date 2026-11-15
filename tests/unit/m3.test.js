@@ -137,10 +137,13 @@ test('openFolderPicker filters non-media and resets the input', async () => {
     const { default: FileHandler } = await import('../../src/core/file-handler.ts');
     const added = [];
     const playlist = { addFiles: async (files) => { added.push(files); return null; } };
-    new FileHandler(playlist).openFolderPicker();
+    const handler = new FileHandler(playlist);
+    input.value = 'stale-from-previous-pick';
+    handler.openFolderPicker();
 
     assert.equal(appended.length, 1);
     assert.equal(input.clicks, 1);
+    assert.equal(input.value, '', 'value reset before the picker opens');
 
     input.value = 'C:\\fakepath';
     input.files = [file('a.mp3', 'audio/mpeg'), file('b.txt', 'text/plain'), file('c.mov', '')];
@@ -149,7 +152,9 @@ test('openFolderPicker filters non-media and resets the input', async () => {
 
     assert.equal(added.length, 1);
     assert.deepEqual(added[0].map((f) => f.name), ['a.mp3', 'c.mov']);
-    assert.equal(input.value, '');
+
+    handler.openFolderPicker();
+    assert.equal(input.value, '', 'second pick starts clean');
   } finally {
     globalThis.document = original;
   }

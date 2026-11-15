@@ -5,6 +5,7 @@
 import { clearDebugLog, debugLogging, debugLogLines, setDebugLogging } from './utils/debug.ts';
 import { audioDiagnostics } from './core/audio-volume';
 import { blobUrlDiagnostics } from './core/player-broker';
+import { sessionDiagnostics } from './core/session-manager.ts';
 
 declare global {
   interface Navigator {
@@ -185,6 +186,7 @@ async function snapshot(): Promise<string[]> {
   add('media volume / muted', media ? `${media.volume} / ${media.muted}` : 'none');
   add('audio graph', audioDiagnostics());
   add('blob URLs', blobUrlDiagnostics());
+  add('queue', sessionDiagnostics());
   add(
     'mediaSession',
     'mediaSession' in navigator

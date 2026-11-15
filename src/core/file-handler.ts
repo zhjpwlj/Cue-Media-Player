@@ -1,6 +1,7 @@
 // Native-only media detection for Milestone 2. FormatBridge (M13) owns the
 // real classification; until then, anything not natively playable is rejected.
 import type PlaylistManager from './playlist-manager';
+import { debug } from '../utils/debug.ts';
 
 export type TrackKind = 'audio' | 'video';
 
@@ -61,8 +62,11 @@ export default class FileHandler {
         input.remove();
         resolve(files);
       };
-      input.addEventListener('change', () => settle([...(input.files ?? [])]));
-      document.body.append(input);
+      input.addEventListener('change', () => {
+        const picked = [...(input.files ?? [])];
+        debug('files', 'file pick', picked.length, 'raw');
+        settle(picked);
+      });      document.body.append(input);
       // Register before click(): the dialog can take focus and return it fast.
       window.addEventListener('focus', () => setTimeout(() => settle([]), 1000), { once: true });
       input.click();
@@ -83,20 +87,22 @@ export default class FileHandler {
       input.multiple = true;
       input.hidden = true;
       input.addEventListener('change', () => {
+        const picked = [...(input.files ?? [])];
         // FileList order is filesystem-dependent; users expect alphabetical.
-        const files = mediaFiles([...(input.files ?? [])]).sort((a, b) =>
-          a.name.localeCompare(b.name),
-        );
+        const files = mediaFiles(picked).sort((a, b) => a.name.localeCompare(b.name));
+        debug('files', 'folder pick', picked.length, 'raw /', files.length, 'media');
         void this.#playlist.addFiles(files).catch(() => {
           document.dispatchEvent(
             new CustomEvent('toast', { detail: { message: 'Could not load that folder.' } }),
           );
         });
-        input.value = ''; // reset for same-folder re-pick
       });
       document.body.append(input);
       this.#folderInput = input;
     }
+    // Reset before opening, not in change: iOS can still be materialising the
+    // File objects when the change handler returns.
+    this.#folderInput.value = '';
     this.#folderInput.click();
   }
 }

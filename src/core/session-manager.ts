@@ -30,6 +30,7 @@ export default class SessionManager {
   }
 
   async init(): Promise<void> {
+    latestSession = this;
     if (this.#session) return;
     this.#session = {
       id: 'default',
@@ -56,5 +57,18 @@ export default class SessionManager {
 
   getOrdered(): Session[] {
     return this.#session ? [this.#session] : [];
+  }
+}
+
+let latestSession: SessionManager | null = null;
+
+/** Diagnostics hook: queue size is otherwise invisible without a console. */
+export function sessionDiagnostics(): string {
+  if (!latestSession) return 'no session';
+  try {
+    const session = latestSession.getActive();
+    return `${session.playlist.length} tracks / index ${session.currentIndex}`;
+  } catch {
+    return 'session not initialised';
   }
 }
