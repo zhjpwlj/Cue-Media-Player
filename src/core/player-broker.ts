@@ -40,6 +40,16 @@ const LOAD_TIMEOUT_MS = 30_000;
 
 export default class PlayerBroker {
   #sessions = new Map<string, SessionRecord>();
+  // Auto-advance fires once per track even when `ended`, `timeupdate`, and the
+  // audio loop-wrap path overlap.
+  #advanced = new WeakSet<HTMLMediaElement>();
+  #lastTime = new WeakMap<HTMLMediaElement, number>();
+  #createdUrls = 0;
+  #revokedUrls = 0;
+
+  constructor() {
+    latestBroker = this;
+  }
 
   async loadTrack(
     sessionId: string,
@@ -65,8 +75,12 @@ export default class PlayerBroker {
     rec.track = track;
     rec.currentType = kind;
     const url = URL.createObjectURL(file);
+    this.#createdUrls += 1;
     rec.urls.set(kind, url);
     element.src = url;
+    this.#lastTime.set(element, 0);
+    // Deliberately do NOT clear #advanced here: the previous track's queued
+    // `ended` event can arrive after the swap and must not advance the new one.
     this.#mount(sessionId, element);
 
     try {
@@ -119,6 +133,47 @@ export default class PlayerBroker {
 
   getCurrentElement(sessionId: string): HTMLMediaElement | null {
     return this.#current(sessionId);
+  }
+
+  /** Forces the session into the terminal state without another media event. */
+  markEnded(sessionId: string): void {
+    this.#setState(sessionId, 'ended');
+  }
+
+  /** createObjectURL - revokeObjectURL; at rest this should equal live sources. */
+  blobUrlStats(): { created: number; revoked: number } {
+    return { created: this.#createdUrls, revoked: this.#revokedUrls };
+  }
+
+  /**
+   * Aborts an in-flight load and restores the last good track, paused. The
+   * superseded loadTrack() sees a stale loadId and rolls nothing back.
+   */
+  async cancelLoad(sessionId: string): Promise<void> {
+    const rec = this.#sessions.get(sessionId);
+    if (!rec || rec.state !== 'loading') return;
+    ++rec.loadId;
+
+    const element = this.getCurrentElement(sessionId);
+    if (element && rec.currentType) {
+      element.pause();
+      this.#release(rec, rec.currentType, element);
+    }
+    rec.currentType = null;
+    rec.track = null;
+
+    const restore = rec.lastGood;
+    rec.lastGood = null;
+    if (!restore) {
+      this.#setState(sessionId, 'idle');
+      return;
+    }
+    try {
+      await this.loadTrack(sessionId, restore.track, restore.file);
+      this.pause(sessionId);
+    } catch {
+      this.#setState(sessionId, 'idle');
+    }
   }
 
   /**
@@ -183,7 +238,9 @@ export default class PlayerBroker {
     });
     el.addEventListener('timeupdate', () => {
       if (this.#current(sessionId) !== el) return;
+      this.#lastTime.set(el, el.currentTime);
       dispatch('time-update', { sessionId, currentTime: el.currentTime, duration: el.duration });
+      this.#checkEnd(sessionId, el);
     });
     el.addEventListener('play', () => {
       this.#pauseOthers(el);
@@ -197,10 +254,32 @@ export default class PlayerBroker {
       this.#setState(sessionId, 'paused');
       dispatch('playback-paused', { sessionId });
     });
-    el.addEventListener('ended', () => {
-      this.#setState(sessionId, 'ended');
-      dispatch('track-ended', { sessionId });
-    });
+    // Audio never fires `ended` while loop is true: catch the wrap instead.
+    if (kind === 'audio') {
+      el.addEventListener('seeking', () => {
+        if (this.#current(sessionId) !== el) return;
+        const previous = this.#lastTime.get(el) ?? 0;
+        const duration = el.duration;
+        const wrapped =
+          Number.isFinite(duration) &&
+          duration > 0 &&
+          previous > duration - 1 &&
+          el.currentTime < 0.5;
+        if (wrapped && !this.#advanced.has(el)) {
+          this.#markAdvanced(el);
+          el.pause();
+          this.#emitTrackEnded(sessionId);
+        }
+        this.#lastTime.set(el, el.currentTime);
+      });
+    } else {
+      el.addEventListener('ended', () => {
+        if (this.#current(sessionId) !== el) return;
+        if (this.#advanced.has(el)) return;
+        this.#markAdvanced(el);
+        this.#emitTrackEnded(sessionId);
+      });
+    }
     el.addEventListener('error', () => {
       // A load failure rejects loadTrack; report it once from there.
       if (this.getState(sessionId) === 'loading') return;
@@ -210,6 +289,25 @@ export default class PlayerBroker {
       const message = el.error?.code === 4 ? 'Format not supported' : 'Playback failed';
       dispatch('playback-error', { sessionId, message, kind });
     });
+  }
+
+  #checkEnd(sessionId: string, el: HTMLMediaElement): void {
+    if (this.#advanced.has(el)) return;
+    const duration = el.duration;
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    const threshold = duration > 2 ? 0.5 : duration * 0.25;
+    if (el.currentTime < duration - threshold) return;
+    this.#markAdvanced(el);
+    this.#emitTrackEnded(sessionId);
+  }
+
+  #emitTrackEnded(sessionId: string): void {
+    dispatch('track-ended', { sessionId });
+  }
+
+  #markAdvanced(el: HTMLMediaElement): void {
+    this.#advanced.add(el);
+    setTimeout(() => this.#advanced.delete(el), 2000);
   }
 
   #pauseOthers(playingElement: HTMLMediaElement): void {
@@ -226,9 +324,13 @@ export default class PlayerBroker {
     // Nothing loaded yet: load() on an empty src can raise error in Safari.
     if (!prev) return;
     element.pause();
+    // Reset the wrap detector before the src reset, or the resulting seek from
+    // near-end to 0 looks like a loop and fires a false track-ended.
+    this.#lastTime.set(element, 0);
     element.removeAttribute('src');
     element.load(); // aborts any in-flight fetch for the old source
     URL.revokeObjectURL(prev);
+    this.#revokedUrls += 1;
     rec.urls.delete(kind);
   }
 
@@ -273,4 +375,13 @@ function onceLoaded(el: HTMLMediaElement, timeoutMs = LOAD_TIMEOUT_MS): Promise<
 
 function dispatch(type: string, detail: unknown): void {
   document.dispatchEvent(new CustomEvent(type, { detail }));
+}
+
+let latestBroker: PlayerBroker | null = null;
+
+/** Diagnostics hook; the panel has no reference to the broker instance. */
+export function blobUrlDiagnostics(): string {
+  if (!latestBroker) return 'no player yet';
+  const { created, revoked } = latestBroker.blobUrlStats();
+  return `created=${created} revoked=${revoked} delta=${created - revoked}`;
 }

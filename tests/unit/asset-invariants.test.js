@@ -48,10 +48,16 @@ test('videos layout DOM exposes required controls', () => {
   // Touch has no hover: the overlay starts visible.
   assert.match(html, /id="player-container"[^>]*class="[^"]*show-controls/);
   // Future-milestone controls must not be silently inert.
-  for (const id of ['btn-menu', 'btn-theme', 'btn-prev', 'btn-next', 'btn-subtitles', 'btn-pip', 'btn-fullscreen']) {
+  for (const id of ['btn-menu', 'btn-theme', 'btn-subtitles', 'btn-pip', 'btn-fullscreen']) {
     const tag = html.match(new RegExp(`<button[^>]*id="${id}"[^>]*>`))?.[0] ?? '';
     assert.ok(tag.includes('disabled'), `${id} must be disabled`);
     assert.ok(tag.includes('title='), `${id} must explain when it is enabled`);
+  }
+  // M4 enabled these; they must carry a label instead of a milestone tooltip.
+  for (const id of ['btn-prev', 'btn-next']) {
+    const tag = html.match(new RegExp(`<button[^>]*id="${id}"[^>]*>`))?.[0] ?? '';
+    assert.ok(!tag.includes('disabled'), `${id} must be enabled in M4`);
+    assert.ok(tag.includes('aria-label='), `${id} needs a label`);
   }
 });
 

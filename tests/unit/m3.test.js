@@ -2,7 +2,28 @@ import test from 'node:test';
 import assert from 'node:assert';
 
 const events = [];
-globalThis.document = { dispatchEvent: (e) => events.push(e) };
+const listeners = new Map();
+globalThis.document = {
+  dispatchEvent: (e) => {
+    events.push(e);
+    for (const fn of listeners.get(e.type) ?? []) fn(e);
+    return true;
+  },
+  addEventListener: (type, fn) => {
+    const list = listeners.get(type) ?? [];
+    list.push(fn);
+    listeners.set(type, list);
+  },
+};
+
+const broker = (overrides = {}) => ({
+  loadTrack: async () => null,
+  play: async () => undefined,
+  pause: () => undefined,
+  getState: () => 'idle',
+  markEnded: () => undefined,
+  ...overrides,
+});
 
 const file = (name, type = '') => ({ name, type, size: 10, lastModified: 1 });
 
@@ -17,24 +38,26 @@ test('SessionManager creates one default session', async () => {
   assert.deepEqual(sessions.getOrdered(), [session]);
 });
 
-test('PlaylistManager loads only the first media file and emits playlist-updated', async () => {
+test('PlaylistManager queues every media file and loads the first', async () => {
   events.length = 0;
   const { default: SessionManager } = await import('../../src/core/session-manager.ts');
   const { default: PlaylistManager } = await import('../../src/core/playlist-manager.ts');
   const sessions = new SessionManager();
   await sessions.init();
   const loaded = [];
-  const broker = { loadTrack: async (_id, track) => { loaded.push(track); return null; } };
-  const playlist = new PlaylistManager(sessions, broker);
+  const playlist = new PlaylistManager(sessions, broker({
+    loadTrack: async (_id, track) => { loaded.push(track); return null; },
+  }));
 
   const track = await playlist.addFiles([file('a.mp3', 'audio/mpeg'), file('b.mp4', 'video/mp4')]);
   assert.equal(loaded.length, 1);
   assert.equal(track.name, 'a');
   assert.equal(track.type, 'audio');
   assert.equal(playlist.getFile(track.id).name, 'a.mp3');
+  assert.equal(sessions.getActive().playlist.length, 2);
   assert.equal(sessions.getActive().currentIndex, 0);
   const updates = events.filter((e) => e.type === 'playlist-updated');
-  assert.equal(updates.length, 1);
+  assert.equal(updates.length, 2); // queue replaced + playIndex landed
   assert.equal(updates[0].detail.sessionId, sessions.activeSessionId);
 });
 
@@ -49,28 +72,27 @@ test('PlaylistManager rejects non-media and keeps the previous state', async () 
   assert.equal(sessions.getActive().currentIndex, -1);
 });
 
-test('PlaylistManager keeps the previous state when loadTrack rejects', async () => {
+test('PlaylistManager keeps the queue but reports a failed first load', async () => {
   events.length = 0;
   const { default: SessionManager } = await import('../../src/core/session-manager.ts');
   const { default: PlaylistManager } = await import('../../src/core/playlist-manager.ts');
   const sessions = new SessionManager();
   await sessions.init();
   const session = sessions.getActive();
-  const previous = { id: 'old', name: 'old', type: 'audio', fileSize: 1, fileLastModified: 1 };
-  session.playlist = [previous];
-  session.currentIndex = 0;
 
-  const playlist = new PlaylistManager(sessions, {
+  const playlist = new PlaylistManager(sessions, broker({
     loadTrack: async () => { throw new Error('load failed'); },
-  });
+  }));
   assert.equal(await playlist.addFiles([file('bad.mp3', 'audio/mpeg')]), null);
-  assert.deepEqual(session.playlist, [previous]);
+  assert.equal(session.playlist.length, 1);
+  assert.equal(session.playlist[0].name, 'bad');
   assert.equal(session.currentIndex, 0);
 
   const toasts = events.filter((e) => e.type === 'toast');
   assert.equal(toasts.length, 1);
-  assert.match(toasts[0].detail.message, /Could not load bad\.mp3/);
-  assert.equal(events.filter((e) => e.type === 'playlist-updated').length, 0);
+  assert.match(toasts[0].detail.message, /Could not play bad/);
+  // Queue replacement is announced once; the failed load does not announce again.
+  assert.equal(events.filter((e) => e.type === 'playlist-updated').length, 1);
 });
 
 test('mediaFiles filters folders to supported media', async () => {

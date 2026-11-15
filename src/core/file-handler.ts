@@ -50,6 +50,7 @@ export default class FileHandler {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = PICKER_ACCEPT;
+      input.multiple = true;
       input.hidden = true;
       // iOS fires no event on cancel; the input is simply never heard from
       // again, so the promise also settles on the next task after focus returns.
@@ -82,7 +83,10 @@ export default class FileHandler {
       input.multiple = true;
       input.hidden = true;
       input.addEventListener('change', () => {
-        const files = mediaFiles([...(input.files ?? [])]);
+        // FileList order is filesystem-dependent; users expect alphabetical.
+        const files = mediaFiles([...(input.files ?? [])]).sort((a, b) =>
+          a.name.localeCompare(b.name),
+        );
         void this.#playlist.addFiles(files).catch(() => {
           document.dispatchEvent(
             new CustomEvent('toast', { detail: { message: 'Could not load that folder.' } }),

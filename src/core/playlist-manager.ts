@@ -3,61 +3,144 @@ import type PlayerBroker from './player-broker';
 import type { Track } from './player-broker';
 import type SessionManager from './session-manager';
 
+type PlaylistBroker = Pick<
+  PlayerBroker,
+  'loadTrack' | 'play' | 'pause' | 'getState' | 'markEnded'
+>;
+
+interface TrackEndedDetail {
+  sessionId: string;
+}
+
 /**
- * Single-track playlist for Milestone 3. M4 turns `playlist` into a real queue
- * and loads every selected file; for now only the first file reaches the broker.
- *
- * `File` objects live in memory only — the browser sandbox cannot persist them.
+ * Queue owner for Milestone 4. Replaces the queue on every pick, loads the
+ * chosen index, and advances on `track-ended`. File objects live in memory
+ * only — the browser sandbox cannot persist them.
  */
 export default class PlaylistManager {
   #sessions: SessionManager;
-  #broker: Pick<PlayerBroker, 'loadTrack'>;
+  #broker: PlaylistBroker;
   #files = new Map<string, File>();
 
-  constructor(sessions: SessionManager, broker: Pick<PlayerBroker, 'loadTrack'>) {
+  constructor(sessions: SessionManager, broker: PlaylistBroker) {
     this.#sessions = sessions;
     this.#broker = broker;
+
+    document.addEventListener('track-ended', (event) => {
+      const { sessionId } = (event as CustomEvent<TrackEndedDetail>).detail;
+      const session = this.#sessions.getActive();
+      if (sessionId !== session.id) return;
+
+      if (session.currentIndex >= session.playlist.length - 1) {
+        // Last track: `audioClean.loop = true` would otherwise loop forever.
+        this.#broker.pause(sessionId);
+        this.#broker.markEnded(sessionId);
+        document.dispatchEvent(
+          new CustomEvent('playlist-finished', { detail: { sessionId } }),
+        );
+        return;
+      }
+      void this.playIndex(session.currentIndex + 1, true);
+    });
   }
 
-  async addFiles(files: File[]): Promise<Track | null> {
-    const file = files[0];
-    if (!file) return null;
+  /**
+   * Replaces the queue with every supported file and loads the first track.
+   * Returns the loaded track, or null when nothing playable was supplied.
+   */
+  async addFiles(files: readonly File[]): Promise<Track | null> {
+    const media = files.filter((file) => mediaKind(file));
+    if (media.length === 0) return null;
 
-    const type = mediaKind(file);
-    if (!type) {
-      console.warn(`[playlist] Unsupported file type: ${file.name}`);
-      return null;
-    }
-
-    const track: Track = {
+    const tracks: Track[] = media.map((file) => ({
       id: crypto.randomUUID(),
-      name: file.name.replace(/\.[^.]+$/, ''),
-      type,
+      name: stripExtension(file.name),
+      type: mediaKind(file) === 'video' ? 'video' : 'audio',
       fileSize: file.size,
       fileLastModified: file.lastModified,
-    };
+    }));
+
+    this.#files.clear();
+    media.forEach((file, index) => {
+      const track = tracks[index];
+      if (track) this.#files.set(track.id, file);
+    });
 
     const session = this.#sessions.getActive();
-    try {
-      await this.#broker.loadTrack(session.id, track, file);
-    } catch {
+    session.playlist = tracks;
+    session.currentIndex = 0;
+    document.dispatchEvent(
+      new CustomEvent('playlist-updated', { detail: { sessionId: session.id } }),
+    );
+
+    return this.playIndex(0, false);
+  }
+
+  async playIndex(index: number, autoplay = false): Promise<Track | null> {
+    const session = this.#sessions.getActive();
+    const track = session.playlist[index];
+    if (!track) return null;
+    // Rapid taps must not start two loads; the last one would win unpredictably.
+    if (this.#broker.getState(session.id) === 'loading') return null;
+
+    const file = this.#files.get(track.id);
+    if (!file) {
       document.dispatchEvent(
-        new CustomEvent('toast', { detail: { message: `Could not load ${file.name}.` } }),
+        new CustomEvent('track-file-missing', {
+          detail: { sessionId: session.id, index },
+        }),
       );
       return null;
     }
 
-    // Load succeeded: replace the single-track playlist. One file per session
-    // in M3, so drop the previous File to keep the map from growing.
-    this.#files.clear();
-    this.#files.set(track.id, file);
-    session.playlist = [track];
-    session.currentIndex = 0;
-    document.dispatchEvent(new CustomEvent('playlist-updated', { detail: { sessionId: session.id } }));
+    session.currentIndex = index;
+    try {
+      await this.#broker.loadTrack(session.id, track, file);
+    } catch {
+      document.dispatchEvent(
+        new CustomEvent('toast', {
+          detail: { message: `Could not play ${track.name}.` },
+        }),
+      );
+      return null;
+    }
+
+    document.dispatchEvent(
+      new CustomEvent('playlist-updated', { detail: { sessionId: session.id } }),
+    );
+
+    if (autoplay) {
+      await this.#broker.play(session.id)?.catch(() => {
+        document.dispatchEvent(
+          new CustomEvent('toast', {
+            detail: { message: 'Playback was blocked by the browser.' },
+          }),
+        );
+      });
+    }
     return track;
+  }
+
+  next(): void {
+    const session = this.#sessions.getActive();
+    if (session.currentIndex < session.playlist.length - 1) {
+      void this.playIndex(session.currentIndex + 1, true);
+    }
+  }
+
+  /** At index 0 this is a no-op, mirroring next() on the last track. */
+  prev(): void {
+    const session = this.#sessions.getActive();
+    if (session.currentIndex > 0) {
+      void this.playIndex(session.currentIndex - 1, true);
+    }
   }
 
   getFile(id: string): File | null {
     return this.#files.get(id) ?? null;
   }
+}
+
+function stripExtension(name: string): string {
+  return name.replace(/\.[^.]+$/, '');
 }

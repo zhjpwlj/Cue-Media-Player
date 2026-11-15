@@ -3,6 +3,7 @@
 // if the harness gains a real inspector; nothing here runs until opened.
 
 import { audioDiagnostics } from './core/audio-volume';
+import { blobUrlDiagnostics } from './core/player-broker';
 
 declare global {
   interface Navigator {
@@ -169,6 +170,7 @@ async function snapshot(): Promise<string[]> {
   );
   add('media volume / muted', media ? `${media.volume} / ${media.muted}` : 'none');
   add('audio graph', audioDiagnostics());
+  add('blob URLs', blobUrlDiagnostics());
 
   await addStorage(add);
   await addServiceWorker(add);

@@ -64,6 +64,8 @@ export default class VideosView {
   #trackName!: HTMLElement;
   #trackBadge!: HTMLElement;
   #playPause!: HTMLButtonElement;
+  #prevButton!: HTMLButtonElement;
+  #nextButton!: HTMLButtonElement;
   #seekBar!: HTMLInputElement;
   #timeDisplay!: HTMLElement;
   #volumeButton!: HTMLButtonElement;
@@ -93,6 +95,8 @@ export default class VideosView {
     this.#trackName = this.#el('track-name');
     this.#trackBadge = this.#el('track-type-badge');
     this.#playPause = this.#el<HTMLButtonElement>('btn-play-pause');
+    this.#prevButton = this.#el<HTMLButtonElement>('btn-prev');
+    this.#nextButton = this.#el<HTMLButtonElement>('btn-next');
     this.#seekBar = this.#el<HTMLInputElement>('seek-bar');
     this.#timeDisplay = this.#el('time-display');
     this.#volumeButton = this.#el<HTMLButtonElement>('btn-volume');
@@ -133,6 +137,8 @@ export default class VideosView {
     });
 
     this.#playPause.addEventListener('click', () => this.#togglePlay());
+    this.#prevButton.addEventListener('click', () => this.#playlist.prev());
+    this.#nextButton.addEventListener('click', () => this.#playlist.next());
     this.#seekBar.addEventListener('input', () => {
       // Ignore timeupdate while the finger is on the bar, or the thumb fights back.
       this.#scrubbing = true;
@@ -231,18 +237,17 @@ export default class VideosView {
     const files = await this.#fileHandler.openFilePicker();
     if (files.length === 0) return;
 
-    const file = files.find((candidate) => mediaKind(candidate));
-    if (!file) {
+    const first = files.find((candidate) => mediaKind(candidate));
+    if (!first) {
       this.#toasts.show('That file type is not supported yet.');
       return;
     }
 
-    this.#trackName.textContent = `Loading ${file.name}…`;
-    const track = await this.#playlist.addFiles([file]);
+    this.#trackName.textContent = `Loading ${first.name}…`;
+    const track = await this.#playlist.addFiles(files);
     if (track) return;
 
-    // PlaylistManager already toasted. Keep the previous track visible: the
-    // broker restores it and emits track-changed, or there was none at all.
+    // PlaylistManager already toasted; keep the current queue entry visible.
     const session = this.#sessions.getActive();
     const current = session.playlist[session.currentIndex];
     this.#trackName.textContent = current?.name ?? 'No file open';
@@ -323,23 +328,11 @@ export default class VideosView {
       item.textContent = track.name;
       item.dataset.index = String(index);
       if (index === session.currentIndex) item.classList.add('active');
-      item.addEventListener('click', () => this.#reloadActive(index));
+      item.addEventListener('click', () => {
+        void this.#playlist.playIndex(index, true);
+      });
       this.#playlistItems.append(item);
     });
   }
 
-  #reloadActive(index: number): void {
-    const session = this.#sessions.getActive();
-    // M3 has one item per session; M4 adds playIndex and full queue loading.
-    if (index !== session.currentIndex) return;
-    if (this.#broker.getState(session.id) === 'loading') return;
-
-    const track = session.playlist[index];
-    const file = track ? this.#playlist.getFile(track.id) : null;
-    if (!track || !file) return;
-
-    void this.#broker.loadTrack(session.id, track, file).catch(() => {
-      this.#toasts.show(`Could not load ${track.name}.`);
-    });
-  }
 }
