@@ -88,3 +88,11 @@ test('simulated fullscreen insets the controls, not the video', () => {
     'fullscreen controls must clear the home indicator',
   );
 });
+
+test('updates activate silently and bypass the HTTP cache', () => {
+  assert.match(read('src/sw.ts'), /self\.skipWaiting\(\)/, 'worker must auto-activate updates');
+  const main = read('src/main.ts');
+  assert.ok(main.includes("updateViaCache: 'none'"), 'sw.js must not come from HTTP cache');
+  assert.ok(main.includes('reg.update()'), 'launch must check for a new deployment');
+  assert.ok(!main.includes('sw-update-available'), 'no manual update prompt remains');
+});

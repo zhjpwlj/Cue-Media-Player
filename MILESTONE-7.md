@@ -116,3 +116,34 @@ Not device-verifiable here: no iPad available in this session.
 - Themes and the theme picker — M8.
 - Full settings sheet (sessions, playback, storage) — M19.
 - Subtitles warning before native handoff — placeholder waits for M11.
+
+---
+
+## Post-M7 — silent launch update (`v0.7.1`)
+
+Launch order is now: **precached shell first, update check in parallel, reload
+once when a new build takes control.** No prompt.
+
+- `src/sw.ts`: `install` calls `self.skipWaiting()`. Activation still waits for
+  the injected precache install, so the new shell is complete before it takes
+  over. The `SKIP_WAITING` message handler stays for older clients.
+- `src/main.ts`: registers with `updateViaCache: 'none'` (an HTTP-cached
+  `sw.js` would hide deployments) and calls `reg.update()` at boot. Offline,
+  that fetch rejects and is ignored; the precached shell runs as before.
+- `src/core/app-update.ts` (new): on `updatefound` → installed, posts
+  `SKIP_WAITING` as a fallback; on `controllerchange`, reloads once. The very
+  first install never reloads, because the running assets already match the
+  worker that just claimed the page.
+- Diagnostics: `Apply update` became `Check for update`, which calls
+  `reg.update()` instead of prompting.
+
+Limits: an update that lands while a track is playing still reloads the page
+and stops playback. Update checks run at launch only, so normal playback is not
+interrupted by a background check.
+
+Verification addition:
+
+- [ ] Deploy a new build with the app open in the foreground, relaunch the PWA
+      once: the footer shows the new version without any prompt.
+- [ ] Airplane mode launch: the app opens from cache, footer shows the last
+      installed version, no error surface.

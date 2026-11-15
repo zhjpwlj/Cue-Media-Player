@@ -145,14 +145,12 @@ function makeButton(label: string, onClick: () => void): HTMLButtonElement {
   return b;
 }
 
-// M1 has no update toast yet, so expose the same path the toast will use.
-// Reuses main.ts's sw-apply-update handler instead of duplicating SKIP_WAITING.
+// Manual check from the diagnostics panel. Normal launches update on their own
+// (main.ts calls reg.update() at boot).
 async function addUpdateButton(bar: HTMLElement): Promise<void> {
   if (!('serviceWorker' in navigator)) return;
-  const reg = await navigator.serviceWorker.getRegistration();
-  if (!reg?.waiting) return;
-  bar.append(makeButton('Apply update', () => {
-    document.dispatchEvent(new CustomEvent('sw-apply-update'));
+  bar.append(makeButton('Check for update', () => {
+    document.dispatchEvent(new CustomEvent('sw-check-update'));
   }));
 }
 

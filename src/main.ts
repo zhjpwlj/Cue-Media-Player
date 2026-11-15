@@ -4,6 +4,7 @@
 // Views mount immediately; boot() runs independently.
 
 import MediaSessionController from './core/media-session';
+import installAutoUpdate from './core/app-update';
 import PlayerBroker from './core/player-broker';
 import FileHandler from './core/file-handler';
 import PlaylistManager from './core/playlist-manager';
@@ -63,7 +64,15 @@ async function boot(): Promise<void> {
 async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!('serviceWorker' in navigator)) return null;
   try {
-    return await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    const reg = await navigator.serviceWorker.register('/sw.js', {
+      scope: '/',
+      // Never let an HTTP-cached sw.js hide a deployment.
+      updateViaCache: 'none',
+    });
+    // Launch update check. The shell came from precache; this only fetches
+    // sw.js, and a changed build activates + reloads (app-update.ts).
+    void reg.update().catch(() => undefined);
+    return reg;
   } catch (err) {
     console.warn('[boot] SW registration failed:', err);
     return null;
@@ -113,23 +122,12 @@ async function triggerFormatBridgePrecache(reg: ServiceWorkerRegistration): Prom
   });
 }
 
-// Update flow: page shows a toast when a new SW is waiting; user confirms → SKIP_WAITING.
+// Update flow: the shell starts from precache, a new deployment activates
+// silently, and the page reloads once into the newest build. The diagnostics
+// panel can force a check without waiting for the next launch.
 function installUpdateListener(reg: ServiceWorkerRegistration): void {
-  const notify = (): void => {
-    if (reg.waiting) {
-      document.dispatchEvent(new CustomEvent('sw-update-available'));
-    }
-  };
-  reg.addEventListener('updatefound', () => {
-    const incoming = reg.installing;
-    incoming?.addEventListener('statechange', () => {
-      if (incoming.state === 'installed') notify();
-    });
-  });
-  notify();
-
-  document.addEventListener('sw-apply-update', () => {
-    reg.waiting?.postMessage({ type: 'SKIP_WAITING' });
-    navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true });
+  installAutoUpdate(reg, navigator.serviceWorker, () => location.reload());
+  document.addEventListener('sw-check-update', () => {
+    void reg.update().catch(() => undefined);
   });
 }

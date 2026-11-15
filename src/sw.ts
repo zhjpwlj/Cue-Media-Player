@@ -20,10 +20,17 @@ declare let self: ServiceWorkerGlobalScope & {
 };
 
 // Take control immediately on first install (no old SW to displace).
-// Updates are NOT auto-applied: the page shows an update-available toast
-// and sends SKIP_WAITING on user confirmation. See the message handler below.
+// Updates install silently and activate without a prompt: the page listens for
+// `controllerchange` and reloads once into the new shell (src/core/app-update.ts).
 clientsClaim();
 cleanupOutdatedCaches();
+
+// Replaces the old "wait for the user to approve" flow. Activation still waits
+// for the injected precache install to finish, so the new shell is complete
+// before it takes over.
+self.addEventListener('install', (event: ExtendableEvent) => {
+  event.waitUntil(self.skipWaiting());
+});
 
 // App shell + themes + icons + mediabunny (injected by workbox at build time).
 // Install fails if any of these fail to cache — that is intentional.
