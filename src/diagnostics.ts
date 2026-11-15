@@ -171,6 +171,12 @@ async function snapshot(): Promise<string[]> {
   add('media volume / muted', media ? `${media.volume} / ${media.muted}` : 'none');
   add('audio graph', audioDiagnostics());
   add('blob URLs', blobUrlDiagnostics());
+  add(
+    'mediaSession',
+    'mediaSession' in navigator
+      ? `${navigator.mediaSession.playbackState} / ${navigator.mediaSession.metadata?.title ?? 'no metadata'}`
+      : 'unsupported',
+  );
 
   await addStorage(add);
   await addServiceWorker(add);

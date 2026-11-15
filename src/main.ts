@@ -3,6 +3,7 @@
 // format-bridge precache (fire-and-forget), install the update listener.
 // Views mount immediately; boot() runs independently.
 
+import MediaSessionController from './core/media-session';
 import PlayerBroker from './core/player-broker';
 import FileHandler from './core/file-handler';
 import PlaylistManager from './core/playlist-manager';
@@ -28,6 +29,9 @@ async function start(): Promise<void> {
     await sessions.init();
     const broker = new PlayerBroker();
     const playlist = new PlaylistManager(sessions, broker);
+    const playlistRegistry = new Map<string, PlaylistManager>();
+    playlistRegistry.set(sessions.activeSessionId, playlist);
+    new MediaSessionController(broker, sessions, playlistRegistry).init();
 
     new VideosView({
       broker,
