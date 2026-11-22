@@ -5,11 +5,14 @@
 
 import MediaSessionController from './core/media-session';
 import installAutoUpdate from './core/app-update';
+import AudioSkinController from './core/audio-skin-controller';
 import PlayerBroker from './core/player-broker';
 import FileHandler from './core/file-handler';
 import PlaylistManager from './core/playlist-manager';
 import SessionManager from './core/session-manager';
+import ThemeManager from './core/theme-manager';
 import SettingsModal from './ui/settings-modal';
+import ThemePicker from './ui/theme-picker';
 import Toasts from './ui/toasts';
 import VideosView from './views/videos-view';
 
@@ -35,13 +38,23 @@ async function start(): Promise<void> {
     playlistRegistry.set(sessions.activeSessionId, playlist);
     new MediaSessionController(broker, sessions, playlistRegistry).init();
 
+    const audioSkin = new AudioSkinController(document.getElementById('audio-skin-mount')!);
+    const themes = new ThemeManager(audioSkin);
+    const themesReady = await initThemes(themes);
+
     new VideosView({
       broker,
       fileHandler: new FileHandler(playlist),
       playlist,
       toasts,
       sessions,
+      audioSkin,
     }).mount(document.querySelector<HTMLElement>('.app-main')!);
+
+    if (themesReady) {
+      new ThemePicker(themes, sessions).mount();
+      await themes.applyForSession(sessions.getActive());
+    }
 
     new SettingsModal(
       sessions,
@@ -49,6 +62,16 @@ async function start(): Promise<void> {
     ).mount();
   } catch {
     toasts.show('Cue failed to start.');
+  }
+}
+
+/** A missing/failed manifest leaves the base look in place; the app still runs. */
+async function initThemes(themes: ThemeManager): Promise<boolean> {
+  try {
+    await themes.init();
+    return true;
+  } catch {
+    return false;
   }
 }
 

@@ -1,0 +1,19 @@
+/* Audio skins are scoped to .audio-skin-<id> and never touch global vars.
+   Layout base lives in src/css/components.css; each skin sets its own look. */
+.audio-skin-spotify {
+  background: linear-gradient(160deg, #1db954 0%, #0f3d24 48%, #121212 100%);
+  color: #ffffff;
+}
+
+.audio-skin-spotify .as-title {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.audio-skin-spotify .as-artist {
+  color: rgb(255 255 255 / 0.78);
+}
+
+.audio-skin-spotify .as-canvas {
+  height: 96px;
+}

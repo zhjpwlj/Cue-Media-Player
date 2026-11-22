@@ -1,0 +1,26 @@
+:root {
+  color-scheme: dark;
+  --bg-primary: #0f0f0f;
+  --bg-secondary: #212121;
+  --bg-elevated: #303030;
+  --bg-hover: #3f3f3f;
+  --text-primary: #f1f1f1;
+  --text-secondary: #aaaaaa;
+  --text-muted: #717171;
+  --accent-primary: #ff0000;
+  --accent-hover: #cc0000;
+  --accent-text: #ffffff;
+  --border-color: #3f3f3f;
+  --shadow: 0 4px 12px rgb(0 0 0 / 0.5);
+  --progress-bg: #3a3a3a;
+  --progress-fill: #ff0000;
+  --progress-thumb: #ffffff;
+  --playlist-active-bg: #272727;
+  --playlist-active-border: #ff0000;
+  --font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-family-mono: "SF Mono", Menlo, monospace;
+  --font-size-base: 15px;
+  --border-radius: 12px;
+  --sidebar-width: 360px;
+  --header-height: 56px;
+}

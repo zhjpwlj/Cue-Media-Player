@@ -1,0 +1,26 @@
+:root {
+  color-scheme: dark;
+  --bg-primary: #040c1c;
+  --bg-secondary: #0c1a33;
+  --bg-elevated: #12264a;
+  --bg-hover: #1a3563;
+  --text-primary: #f5f7fb;
+  --text-secondary: #a8b6d4;
+  --text-muted: #6f80a3;
+  --accent-primary: #0063e5;
+  --accent-hover: #0483ee;
+  --accent-text: #ffffff;
+  --border-color: #1d3358;
+  --shadow: 0 6px 20px rgb(0 22 60 / 0.6);
+  --progress-bg: #223a63;
+  --progress-fill: #0063e5;
+  --progress-thumb: #ffffff;
+  --playlist-active-bg: #10224a;
+  --playlist-active-border: #0063e5;
+  --font-family: "Avenir Next", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-family-mono: "SF Mono", Menlo, monospace;
+  --font-size-base: 15px;
+  --border-radius: 10px;
+  --sidebar-width: 380px;
+  --header-height: 58px;
+}

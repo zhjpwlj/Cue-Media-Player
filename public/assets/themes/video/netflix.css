@@ -1,0 +1,26 @@
+:root {
+  color-scheme: dark;
+  --bg-primary: #141414;
+  --bg-secondary: #1f1f1f;
+  --bg-elevated: #2f2f2f;
+  --bg-hover: #3a3a3a;
+  --text-primary: #ffffff;
+  --text-secondary: #b3b3b3;
+  --text-muted: #808080;
+  --accent-primary: #e50914;
+  --accent-hover: #b1060f;
+  --accent-text: #ffffff;
+  --border-color: #333333;
+  --shadow: 0 4px 16px rgb(0 0 0 / 0.65);
+  --progress-bg: #404040;
+  --progress-fill: #e50914;
+  --progress-thumb: #ffffff;
+  --playlist-active-bg: #262626;
+  --playlist-active-border: #e50914;
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-family-mono: "SF Mono", Menlo, monospace;
+  --font-size-base: 15px;
+  --border-radius: 4px;
+  --sidebar-width: 380px;
+  --header-height: 60px;
+}

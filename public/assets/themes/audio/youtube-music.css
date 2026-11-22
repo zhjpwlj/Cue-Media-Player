@@ -1,0 +1,20 @@
+.audio-skin-youtube-music {
+  background: radial-gradient(circle at 30% 20%, #3a3a3a 0%, #181818 55%, #030303 100%);
+  color: #ffffff;
+}
+
+.audio-skin-youtube-music .as-title {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.audio-skin-youtube-music .as-artist {
+  color: #ff0033;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+}
+
+.audio-skin-youtube-music .as-canvas {
+  height: 84px;
+}

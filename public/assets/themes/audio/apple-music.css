@@ -1,0 +1,18 @@
+.audio-skin-apple-music {
+  background: linear-gradient(150deg, #fa2d48 0%, #8e1b3a 42%, #1c1c1e 100%);
+  color: #ffffff;
+}
+
+.audio-skin-apple-music .as-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.audio-skin-apple-music .as-artist {
+  color: rgb(255 255 255 / 0.76);
+}
+
+.audio-skin-apple-music .as-canvas {
+  height: 100px;
+}

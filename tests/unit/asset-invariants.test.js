@@ -48,10 +48,16 @@ test('videos layout DOM exposes required controls', () => {
   // Touch has no hover: the overlay starts visible.
   assert.match(html, /id="player-container"[^>]*class="[^"]*show-controls/);
   // Future-milestone controls must not be silently inert.
-  for (const id of ['btn-menu', 'btn-theme', 'btn-subtitles']) {
+  for (const id of ['btn-menu', 'btn-subtitles']) {
     const tag = html.match(new RegExp(`<button[^>]*id="${id}"[^>]*>`))?.[0] ?? '';
     assert.ok(tag.includes('disabled'), `${id} must be disabled`);
     assert.ok(tag.includes('title='), `${id} must explain when it is enabled`);
+  }
+  // M8 enabled the theme picker.
+  {
+    const tag = html.match(/<button[^>]*id="btn-theme"[^>]*>/)?.[0] ?? '';
+    assert.ok(!tag.includes('disabled'), 'btn-theme must be enabled in M8');
+    assert.ok(tag.includes('aria-label='), 'btn-theme needs a label');
   }
   // M7 enabled fullscreen and PiP; they ship hidden until a video loads.
   for (const id of ['btn-fullscreen', 'btn-pip']) {
@@ -95,4 +101,45 @@ test('updates activate silently and bypass the HTTP cache', () => {
   assert.ok(main.includes("updateViaCache: 'none'"), 'sw.js must not come from HTTP cache');
   assert.ok(main.includes('reg.update()'), 'launch must check for a new deployment');
   assert.ok(!main.includes('sw-update-available'), 'no manual update prompt remains');
+});
+
+test('theme manifest lists five video and five audio themes, files present', () => {
+  const manifest = JSON.parse(read('public/assets/themes/manifest.json'));
+  assert.equal(manifest.video.length, 5);
+  assert.equal(manifest.audio.length, 5);
+  for (const kind of ['video', 'audio']) {
+    const ids = manifest[kind].map((entry) => entry.id);
+    assert.equal(new Set(ids).size, ids.length, `${kind} theme ids must be unique`);
+    for (const entry of manifest[kind]) {
+      assert.ok(entry.color, `${entry.id} needs a picker swatch`);
+      const file = `public${entry.path}`;
+      assert.ok(existsSync(join(root, file)), `missing ${file}`);
+      const css = read(file);
+      if (kind === 'video') {
+        assert.ok(css.includes(':root'), `${entry.id} must set the variable contract`);
+      } else {
+        assert.ok(
+          css.includes(`.audio-skin-${entry.id}`),
+          `${entry.id} audio theme must be scoped to its class`,
+        );
+        assert.ok(!css.includes(':root'), `${entry.id} audio theme must not touch global vars`);
+      }
+    }
+  }
+});
+
+test('theme CSS is inside the precache glob', () => {
+  const config = read('workbox-config.cjs');
+  assert.ok(config.includes('css'), 'theme CSS must be precached with the shell');
+});
+
+test('audio skin surface and theme picker DOM exist', () => {
+  const html = read('src/index.html');
+  for (const id of [
+    'audio-skin-mount', 'theme-picker', 'video-theme-options',
+    'audio-theme-options', 'btn-theme-close',
+  ]) {
+    assert.ok(html.includes(`id="${id}"`), `missing #${id}`);
+  }
+  assert.match(html, /id="audio-skin-mount"[^>]*hidden/, 'skin stays hidden until audio plays');
 });

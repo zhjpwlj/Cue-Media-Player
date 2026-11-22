@@ -1,4 +1,5 @@
 import AudioVolume from '../core/audio-volume';
+import type AudioSkinController from '../core/audio-skin-controller';
 import { mediaKind } from '../core/file-handler';
 import type FileHandler from '../core/file-handler';
 import type PlaylistManager from '../core/playlist-manager';
@@ -16,6 +17,7 @@ interface VideosViewDeps {
   playlist: PlaylistManager;
   toasts: Toasts;
   sessions: SessionManager;
+  audioSkin: AudioSkinController;
 }
 
 interface TrackChangedDetail {
@@ -57,9 +59,11 @@ export default class VideosView {
   #playlist: PlaylistManager;
   #toasts: Toasts;
   #sessions: SessionManager;
+  #audioSkin: AudioSkinController;
 
   #playerContainer!: HTMLElement;
   #mediaSlot!: HTMLElement;
+  #audioSkinMount!: HTMLElement;
   #sessionTitle!: HTMLElement;
   #trackName!: HTMLElement;
   #trackBadge!: HTMLElement;
@@ -82,17 +86,19 @@ export default class VideosView {
   #audioVolume = new AudioVolume(this.#isIOS);
   #scrubbing = false;
 
-  constructor({ broker, fileHandler, playlist, toasts, sessions }: VideosViewDeps) {
+  constructor({ broker, fileHandler, playlist, toasts, sessions, audioSkin }: VideosViewDeps) {
     this.#broker = broker;
     this.#fileHandler = fileHandler;
     this.#playlist = playlist;
     this.#toasts = toasts;
     this.#sessions = sessions;
+    this.#audioSkin = audioSkin;
   }
 
   mount(container: HTMLElement): void {
     this.#playerContainer = this.#el('player-container');
     this.#mediaSlot = this.#el('player-media-slot');
+    this.#audioSkinMount = this.#el('audio-skin-mount');
     this.#sessionTitle = this.#el('session-title');
     this.#trackName = this.#el('track-name');
     this.#trackBadge = this.#el('track-type-badge');
@@ -292,6 +298,22 @@ export default class VideosView {
     this.#applyVolume();
     this.#refreshAirplay();
     this.#refreshDisplayButtons(detail.track.type);
+    this.#showAudioSurface(detail.track, session);
+  }
+
+  /** Audio swaps the media element out for the themed skin surface (M8). */
+  #showAudioSurface(track: Track, session: Session): void {
+    const isAudio = track.type === 'audio';
+    this.#mediaSlot.classList.toggle('hidden', isAudio);
+    this.#audioSkinMount.hidden = !isAudio;
+    if (!isAudio) return;
+
+    this.#audioSkin.load(session.audioThemeId);
+    this.#audioSkin.setMetadata({
+      title: track.name,
+      artist: session.name,
+      album: '',
+    });
   }
 
   #onTimeUpdate(detail: TimeUpdateDetail): void {

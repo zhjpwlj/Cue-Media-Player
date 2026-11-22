@@ -1,0 +1,16 @@
+{
+  "video": [
+    { "id": "youtube", "name": "YouTube", "path": "/assets/themes/video/youtube.css", "color": "#ff0000" },
+    { "id": "netflix", "name": "Netflix", "path": "/assets/themes/video/netflix.css", "color": "#e50914" },
+    { "id": "disney-plus", "name": "Disney+", "path": "/assets/themes/video/disney-plus.css", "color": "#0063e5" },
+    { "id": "prime-video", "name": "Prime Video", "path": "/assets/themes/video/prime-video.css", "color": "#00a8e1" },
+    { "id": "custom", "name": "Custom", "path": "/assets/themes/video/custom.css", "color": "#5b8def" }
+  ],
+  "audio": [
+    { "id": "spotify", "name": "Spotify", "path": "/assets/themes/audio/spotify.css", "color": "#1db954" },
+    { "id": "apple-music", "name": "Apple Music", "path": "/assets/themes/audio/apple-music.css", "color": "#fa2d48" },
+    { "id": "soundcloud", "name": "SoundCloud", "path": "/assets/themes/audio/soundcloud.css", "color": "#ff5500" },
+    { "id": "youtube-music", "name": "YouTube Music", "path": "/assets/themes/audio/youtube-music.css", "color": "#ff0033" },
+    { "id": "custom", "name": "Custom", "path": "/assets/themes/audio/custom.css", "color": "#5b8def" }
+  ]
+}

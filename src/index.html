@@ -23,12 +23,13 @@
             <button id="btn-menu" type="button" disabled aria-disabled="true" title="Sessions — available in M9">☰</button>
             <span id="session-title">Cue 1</span>
             <button id="btn-settings" type="button" aria-label="Settings">⚙</button>
-            <button id="btn-theme" type="button" disabled aria-disabled="true" title="Themes — available in M8">◐</button>
+            <button id="btn-theme" type="button" aria-label="Themes">◐</button>
           </header>
           <div class="main-layout">
             <div class="video-column">
               <section id="player-container" class="show-controls">
                 <div id="player-media-slot"></div>
+                <div id="audio-skin-mount" hidden></div>
                 <div id="controls-overlay">
                   <button id="btn-prev" type="button" aria-label="Previous track">⏮</button>
                   <button id="btn-play-pause" type="button" aria-label="Play">▶</button>
@@ -64,7 +65,7 @@
         </section>
       </main>
     </div>
-    <footer class="app-version">v0.7.1</footer>
+    <footer class="app-version">v0.8.0</footer>
 
     <div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <div class="modal-content">
@@ -74,6 +75,17 @@
           Use simulated fullscreen (recommended)
         </label>
         <button id="btn-settings-close" class="btn" type="button">Close</button>
+      </div>
+    </div>
+
+    <div id="theme-picker" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="theme-picker-title">
+      <div class="modal-content">
+        <h2 id="theme-picker-title">Themes</h2>
+        <h3>Video themes</h3>
+        <div id="video-theme-options" class="theme-options"></div>
+        <h3>Audio themes</h3>
+        <div id="audio-theme-options" class="theme-options"></div>
+        <button id="btn-theme-close" class="btn" type="button">Close</button>
       </div>
     </div>
 
