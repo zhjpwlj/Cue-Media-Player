@@ -1,7 +1,10 @@
 /* Audio skins are scoped to .audio-skin-<id> and never touch global vars.
-   Layout base lives in src/css/components.css; each skin sets its own look. */
+   Layout base lives in src/css/components.css; each skin sets its own look.
+   Keep the text area dark: white text over a bright brand gradient fails
+   contrast, so brand colour lives in the stripe and the deep gradient. */
 .audio-skin-spotify {
-  background: linear-gradient(160deg, #1db954 0%, #0f3d24 48%, #121212 100%);
+  border-left-color: #1db954;
+  background: linear-gradient(160deg, #0f3d24 0%, #0b2318 45%, #121212 100%);
   color: #ffffff;
 }
 
@@ -11,7 +14,7 @@
 }
 
 .audio-skin-spotify .as-artist {
-  color: rgb(255 255 255 / 0.78);
+  color: rgb(255 255 255 / 0.82);
 }
 
 .audio-skin-spotify .as-canvas {

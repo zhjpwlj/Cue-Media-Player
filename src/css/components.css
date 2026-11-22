@@ -1,10 +1,39 @@
-/* Shared controls and toasts. The videos layout lives in layout-videos.css. */
+/* Shared controls, overlays and surfaces. Videos layout lives in
+   layout-videos.css. */
+
+/* --- Icons -------------------------------------------------------------- */
+
+/* Kept as a zero-size element, not display:none: Safari will not resolve
+   <use> references into a display:none sprite. */
+.icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* --- Buttons ------------------------------------------------------------ */
 
 .btn {
-  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
   padding: 10px 16px;
   border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
+  border-radius: 10px;
   background: var(--bg-elevated);
   color: var(--text-primary);
   font: inherit;
@@ -12,10 +41,25 @@
   cursor: pointer;
   /* iOS: removes the 300ms tap delay without disabling zoom elsewhere. */
   touch-action: manipulation;
+  transition: background-color 140ms ease-out, border-color 140ms ease-out;
+}
+
+.btn:hover {
+  background: var(--bg-hover);
 }
 
 .btn:active {
   background: var(--bg-hover);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.btn .icon {
+  width: 18px;
+  height: 18px;
 }
 
 .btn-primary {
@@ -24,9 +68,47 @@
   color: var(--accent-text);
 }
 
+.btn-primary:hover,
 .btn-primary:active {
   background: var(--accent-hover);
 }
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 140ms ease-out, color 140ms ease-out;
+}
+
+.icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.icon-btn:active {
+  background: var(--bg-elevated);
+}
+
+.icon-btn:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* One disabled look for every milestone-gated control. */
+button:disabled {
+  cursor: default;
+}
+
+/* --- Toasts ------------------------------------------------------------- */
 
 .toasts {
   position: fixed;
@@ -46,7 +128,7 @@
   margin: 0;
   padding: 10px 14px;
   border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
+  border-radius: 10px;
   background: var(--bg-elevated);
   box-shadow: var(--shadow);
   font-size: 14px;
@@ -58,7 +140,7 @@
   display: none !important;
 }
 
-/* --- Settings sheet (M7; expanded in M19) ------------------------------- */
+/* --- Sheets (M7 settings, M8 themes) ------------------------------------ */
 
 .modal {
   position: fixed;
@@ -68,7 +150,7 @@
   align-items: center;
   justify-content: center;
   padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px);
-  background: rgb(0 0 0 / 0.6);
+  background: rgb(0 0 0 / 0.62);
 }
 
 .modal-content {
@@ -76,44 +158,68 @@
   flex-direction: column;
   gap: 16px;
   width: 100%;
-  max-width: 420px;
+  max-width: 520px;
+  max-height: 100%;
   padding: 20px;
+  overflow-y: auto;
   border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
+  border-radius: 16px;
   background: var(--bg-secondary);
   box-shadow: var(--shadow);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
 .modal-content h2 {
   margin: 0;
   font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .modal-content h3 {
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
 }
 
 .modal-option {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   min-height: 44px;
+  font-size: 14px;
 }
 
 .modal-option input {
   width: 20px;
   height: 20px;
+  margin: 1px 0 0;
+  flex: 0 0 auto;
   accent-color: var(--accent-primary);
 }
 
+.option-hint {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* --- Theme picker ------------------------------------------------------- */
+
 .theme-options {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 8px;
 }
 
@@ -123,24 +229,38 @@
   gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
+  border-radius: 10px;
   background: var(--bg-elevated);
   color: var(--text-primary);
   font: inherit;
+  font-size: 14px;
   text-align: left;
   cursor: pointer;
+  transition: background-color 140ms ease-out, border-color 140ms ease-out;
+}
+
+.theme-option:hover {
+  background: var(--bg-hover);
 }
 
 .theme-option[aria-pressed="true"] {
+  background: var(--playlist-active-bg);
   border-color: var(--accent-primary);
-  box-shadow: inset 0 0 0 1px var(--accent-primary);
 }
 
 .theme-swatch {
   width: 18px;
   height: 18px;
-  border-radius: 50%;
   flex: 0 0 auto;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22);
+}
+
+.theme-check {
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  color: var(--accent-primary);
 }
 
 /* --- Audio skin surface (M8; filled in by M12/M18) ---------------------- */
@@ -153,27 +273,33 @@
 .audio-skin {
   position: absolute;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  display: grid;
+  grid-template-rows: 1fr auto;
   gap: 16px;
   padding: 24px;
   overflow: hidden;
+  /* Reserved so per-skin brand stripes do not shift the text between swaps. */
+  border-left: 4px solid transparent;
   background: var(--bg-secondary);
 }
 
 .as-info {
+  align-self: center;
   min-width: 0;
 }
 
 .as-title {
   font-size: 24px;
   font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
   overflow-wrap: anywhere;
 }
 
 .as-artist {
+  margin-top: 4px;
   color: var(--text-secondary);
+  font-size: 14px;
   overflow-wrap: anywhere;
 }
 
@@ -190,8 +316,7 @@ body.simulated-fs-active {
 }
 
 body.simulated-fs-active .top-bar,
-body.simulated-fs-active #track-info,
-body.simulated-fs-active #action-row,
+body.simulated-fs-active #now-playing,
 body.simulated-fs-active #playlist-sidebar,
 body.simulated-fs-active #app-footer,
 body.simulated-fs-active .app-version {
@@ -215,6 +340,7 @@ body.simulated-fs-active #player-container {
   width: 100vw;
   height: 100dvh;
   aspect-ratio: auto;
+  border: 0;
   border-radius: 0;
   background: #000;
 }
@@ -228,7 +354,7 @@ body.simulated-fs-active #player-media-slot video {
 /* The video runs edge to edge; only the controls respect the insets. */
 body.simulated-fs-active #controls-overlay {
   opacity: 1;
-  padding-bottom: calc(8px + env(safe-area-inset-bottom));
-  padding-left: calc(12px + env(safe-area-inset-left));
-  padding-right: calc(12px + env(safe-area-inset-right));
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  padding-left: calc(16px + env(safe-area-inset-left));
+  padding-right: calc(16px + env(safe-area-inset-right));
 }

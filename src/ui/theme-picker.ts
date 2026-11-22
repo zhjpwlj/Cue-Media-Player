@@ -65,6 +65,15 @@ export default class ThemePicker {
       const label = document.createElement('span');
       label.textContent = entry.name;
       button.append(swatch, label);
+      if (entry.id === activeId) {
+        const check = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        check.setAttribute('class', 'icon theme-check');
+        check.setAttribute('aria-hidden', 'true');
+        const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+        use.setAttribute('href', '#i-check');
+        check.append(use);
+        button.append(check);
+      }
 
       button.addEventListener('click', () => {
         void this.#select(kind, entry.id);

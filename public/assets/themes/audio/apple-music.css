@@ -1,5 +1,6 @@
 .audio-skin-apple-music {
-  background: linear-gradient(150deg, #fa2d48 0%, #8e1b3a 42%, #1c1c1e 100%);
+  border-left-color: #fa243c;
+  background: linear-gradient(150deg, #5c1526 0%, #2c0c15 45%, #1c1c1e 100%);
   color: #ffffff;
 }
 
@@ -10,7 +11,7 @@
 }
 
 .audio-skin-apple-music .as-artist {
-  color: rgb(255 255 255 / 0.76);
+  color: rgb(255 255 255 / 0.8);
 }
 
 .audio-skin-apple-music .as-canvas {

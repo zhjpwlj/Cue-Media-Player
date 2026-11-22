@@ -92,9 +92,25 @@ exists.
 5. **No animations in any theme**, so `prefers-reduced-motion` has nothing to
    gate yet.
 
+## UI pass after M8
+
+- Player panel shows a real empty state ("Nothing loaded") and keeps 16:9 at
+  every width, so the queue is reachable on a portrait tablet.
+- Audio gets its own panel height (`#player-container.is-audio`, 280–460 px);
+  a 16:9 box was clipping the artist line on phones.
+- Audio skin base is a two-row grid: title/artist centred, canvas pinned at the
+  bottom for the M12 waveform. Brand colour sits in a 4 px left stripe plus a
+  dark gradient; white text over a bright brand gradient failed contrast
+  (Spotify white on #1db954 was 2.59:1). Each skin's text now measures ≥4.5:1
+  at the brightest point of its gradient.
+- User-facing controls use the SVG sprite instead of text glyphs (▶, ⛶, 🔇).
+- Queue rows have index numbers, a track count, and an active row; an empty
+  queue no longer leaves a large gap.
+- Theme options are a two-column grid with swatch, `aria-pressed` and a check.
+
 ## Verification on device (installed PWA)
 
-- [ ] Footer reads `v0.8.0`.
+- [ ] Footer reads `v0.8.1`.
 - [ ] ◐ opens the sheet; 5 video and 5 audio options with swatches.
 - [ ] Video theme swap is instant, no flash, chrome colours change.
 - [ ] Audio theme swap changes only the audio surface, not the app chrome.

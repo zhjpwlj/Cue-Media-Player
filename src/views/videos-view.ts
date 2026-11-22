@@ -75,6 +75,8 @@ export default class VideosView {
   #volumeButton!: HTMLButtonElement;
   #volumeSlider!: HTMLInputElement;
   #playlistItems!: HTMLElement;
+  #playlistEmpty!: HTMLElement;
+  #playlistCount!: HTMLElement;
   #airplayButton!: HTMLButtonElement;
   #folderButton!: HTMLButtonElement;
   #fullscreenButton!: HTMLButtonElement;
@@ -110,6 +112,8 @@ export default class VideosView {
     this.#volumeButton = this.#el<HTMLButtonElement>('btn-volume');
     this.#volumeSlider = this.#el<HTMLInputElement>('volume-slider');
     this.#playlistItems = this.#el('playlist-items');
+    this.#playlistEmpty = this.#el('playlist-empty');
+    this.#playlistCount = this.#el('playlist-count');
     this.#airplayButton = this.#el<HTMLButtonElement>('btn-airplay');
     this.#folderButton = this.#el<HTMLButtonElement>('btn-select-folder');
     this.#fullscreenButton = this.#el<HTMLButtonElement>('btn-fullscreen');
@@ -256,7 +260,7 @@ export default class VideosView {
     document.addEventListener('fullscreen-changed', (event) => {
       const detail = (event as CustomEvent<{ sessionId: string; active: boolean }>).detail;
       if (!this.#isActive(detail.sessionId)) return;
-      this.#fullscreenButton.textContent = detail.active ? '⤢' : '⛶';
+      setIcon(this.#fullscreenButton, detail.active ? 'i-fullscreen-exit' : 'i-fullscreen');
       this.#fullscreenButton.setAttribute(
         'aria-label',
         detail.active ? 'Exit fullscreen' : 'Fullscreen',
@@ -291,6 +295,7 @@ export default class VideosView {
   #onTrackChanged(detail: TrackChangedDetail): void {
     const session = this.#sessions.getActive();
     session.currentTrackType = detail.track.type;
+    this.#playerContainer.classList.remove('no-media');
     this.#trackName.textContent = detail.track.name;
     this.#trackBadge.textContent = detail.track.type === 'video' ? 'Video' : 'Audio';
     this.#seekBar.value = '0';
@@ -304,6 +309,7 @@ export default class VideosView {
   /** Audio swaps the media element out for the themed skin surface (M8). */
   #showAudioSurface(track: Track, session: Session): void {
     const isAudio = track.type === 'audio';
+    this.#playerContainer.classList.toggle('is-audio', isAudio);
     this.#mediaSlot.classList.toggle('hidden', isAudio);
     this.#audioSkinMount.hidden = !isAudio;
     if (!isAudio) return;
@@ -325,7 +331,7 @@ export default class VideosView {
 
   #onStateChanged(state: PlayerState): void {
     const playing = state === 'playing';
-    this.#playPause.textContent = playing ? '❚❚' : '▶';
+    setIcon(this.#playPause, playing ? 'i-pause' : 'i-play');
     this.#playPause.setAttribute('aria-label', playing ? 'Pause' : 'Play');
   }
 
@@ -355,7 +361,7 @@ export default class VideosView {
     const el = this.#broker.getCurrentElement(session.id);
     if (el) el.muted = session.muted;
     this.#volumeSlider.value = String(this.#volume);
-    this.#volumeButton.textContent = session.muted ? '🔇' : '🔊';
+    setIcon(this.#volumeButton, session.muted ? 'i-mute' : 'i-volume');
     this.#volumeButton.setAttribute('aria-label', session.muted ? 'Unmute' : 'Mute');
   }
 
@@ -384,11 +390,26 @@ export default class VideosView {
   #renderPlaylist(): void {
     const session = this.#sessions.getActive();
     this.#playlistItems.replaceChildren();
+    this.#playlistCount.textContent =
+      session.playlist.length > 0 ? String(session.playlist.length) : '';
+    this.#playlistEmpty.hidden = session.playlist.length > 0;
+
     session.playlist.forEach((track, index) => {
       const item = document.createElement('li');
-      item.textContent = track.name;
       item.dataset.index = String(index);
-      if (index === session.currentIndex) item.classList.add('active');
+
+      const number = document.createElement('span');
+      number.className = 'queue-index';
+      number.textContent = String(index + 1).padStart(2, '0');
+      const label = document.createElement('span');
+      label.className = 'queue-label';
+      label.textContent = track.name;
+
+      item.append(number, label);
+      if (index === session.currentIndex) {
+        item.classList.add('active');
+        item.setAttribute('aria-current', 'true');
+      }
       item.addEventListener('click', () => {
         void this.#playlist.playIndex(index, true);
       });
@@ -396,4 +417,9 @@ export default class VideosView {
     });
   }
 
+}
+
+/** Swaps the symbol inside a button's SVG without touching its layout. */
+function setIcon(button: HTMLButtonElement, iconId: string): void {
+  button.querySelector('use')?.setAttribute('href', `#${iconId}`);
 }

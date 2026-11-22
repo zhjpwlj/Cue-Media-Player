@@ -1,9 +1,7 @@
 .audio-skin-soundcloud {
-  display: grid;
-  grid-template-rows: 1fr auto;
-  background: linear-gradient(135deg, #ff5500, #1a1a1a);
+  border-left-color: #ff5500;
+  background: linear-gradient(135deg, #4d2609 0%, #241206 45%, #141414 100%);
   color: #ffffff;
-  padding: 24px;
 }
 
 .audio-skin-soundcloud .as-title {
@@ -14,7 +12,7 @@
 
 .audio-skin-soundcloud .as-artist {
   font-size: 16px;
-  color: rgb(255 255 255 / 0.8);
+  color: rgb(255 255 255 / 0.82);
 }
 
 .audio-skin-soundcloud .as-canvas {

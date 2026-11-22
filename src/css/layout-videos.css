@@ -1,5 +1,5 @@
-/* Milestone 3 videos layout. Height comes from .app-main (body owns the
-   viewport and the safe-area insets); never claim viewport height here. */
+/* Videos layout. Height comes from .app-main (body owns the viewport and the
+   safe-area insets); never claim viewport height here. */
 
 #view-videos {
   display: flex;
@@ -8,39 +8,42 @@
 }
 
 .top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-2);
   height: var(--header-height);
-  padding: 0 16px;
+  padding: 0 var(--space-4);
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
 }
 
 #session-title {
   flex: 1;
-  font-size: 16px;
+  min-width: 0;
+  font-size: 15px;
   font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .main-layout {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr var(--sidebar-width);
-  gap: 16px;
-  padding: 16px;
-}
-
-@media (max-width: 899px) {
-  .main-layout {
-    grid-template-columns: 1fr;
-  }
+  grid-template-columns: minmax(0, 1fr) var(--sidebar-width);
+  gap: 20px;
+  padding: 20px;
+  min-height: 0;
 }
 
 .video-column {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   min-width: 0;
 }
 
@@ -48,14 +51,9 @@
   position: relative;
   aspect-ratio: 16 / 9;
   background: #000;
+  border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   overflow: hidden;
-}
-
-@media (max-width: 899px) {
-  #player-container {
-    aspect-ratio: 4 / 3;
-  }
 }
 
 #player-media-slot {
@@ -77,134 +75,374 @@
   width: calc(100% - 32px);
 }
 
+/* Audio has no frame to preserve; give the skin room for title + waveform. */
+#player-container.is-audio {
+  aspect-ratio: auto;
+  height: clamp(280px, 48vh, 460px);
+}
+
+#player-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 24px;
+  color: var(--text-muted);
+  text-align: center;
+  pointer-events: none;
+}
+
+#player-empty .icon {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  stroke-width: 1.5;
+}
+
+.player-empty-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.player-empty-hint {
+  margin: 0;
+  max-width: 34ch;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+#player-container:not(.no-media) #player-empty {
+  display: none;
+}
+
+#player-container.no-media #controls-overlay {
+  display: none;
+}
+
+/* --- Transport ---------------------------------------------------------- */
+
 #controls-overlay {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 2;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: linear-gradient(transparent, rgb(0 0 0 / 0.8));
+  flex-direction: column;
+  gap: 6px;
+  padding: 22px 14px 12px;
+  background: linear-gradient(transparent, rgb(0 0 0 / 0.78));
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 180ms ease-out;
 }
 
 #player-container:hover #controls-overlay,
-#player-container.show-controls #controls-overlay {
+#player-container.show-controls #controls-overlay,
+#player-container:focus-within #controls-overlay {
   opacity: 1;
 }
 
-#controls-overlay button {
-  background: none;
-  border: 0;
-  color: var(--text-primary);
-  font: inherit;
-  padding: 6px;
-}
-
-#controls-overlay button:disabled {
-  opacity: 0.4;
-  pointer-events: none;
-}
-
-/* One disabled look for every milestone-gated control. */
-button:disabled {
-  opacity: 0.4;
+.transport-seek {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 #seek-bar {
   flex: 1;
   min-width: 0;
+  height: 24px;
+  margin: 0;
+  background: transparent;
+  accent-color: var(--accent-primary);
 }
 
 #time-display {
+  color: var(--text-secondary);
   font-family: var(--font-family-mono);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
+.transport-buttons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.transport-spacer {
+  flex: 1;
+}
+
+.transport-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 140ms ease-out;
+}
+
+.transport-btn:hover {
+  background: rgb(255 255 255 / 0.1);
+}
+
+.transport-btn:active {
+  background: rgb(255 255 255 / 0.16);
+}
+
+.transport-btn:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.play-btn {
+  width: 44px;
+  height: 44px;
+  margin: 0 4px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  color: var(--accent-text);
+}
+
+.play-btn:hover {
+  background: var(--accent-hover);
+}
+
+.play-btn:active {
+  background: var(--accent-hover);
+}
+
 #volume-slider {
-  width: 80px;
+  width: 84px;
+  margin: 0 8px 0 2px;
+  accent-color: var(--accent-primary);
+}
+
+/* --- Now playing -------------------------------------------------------- */
+
+#now-playing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 32px;
 }
 
 #track-info {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 1.4em;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
 }
 
 #track-name {
+  font-size: 16px;
   font-weight: 600;
+  letter-spacing: -0.01em;
   overflow-wrap: anywhere;
 }
 
 #track-type-badge {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+#track-type-badge:empty {
+  display: none;
 }
 
 #action-row {
   display: flex;
-  gap: 8px;
+  gap: 2px;
 }
 
-#action-row button:disabled {
-  opacity: 0.4;
-  pointer-events: none;
-}
+/* --- Queue -------------------------------------------------------------- */
 
 #playlist-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  padding: 12px;
-  min-width: 0;
 }
 
-#playlist-sidebar header {
+#playlist-sidebar > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
   font-weight: 600;
-  margin-bottom: 8px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.queue-count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.queue-count:empty {
+  display: none;
 }
 
 #playlist-items {
-  list-style: none;
+  flex: 1;
   margin: 0;
   padding: 0;
+  overflow-y: auto;
+  list-style: none;
 }
 
 #playlist-items li {
-  padding: 8px 12px;
-  border-radius: var(--border-radius);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
   cursor: pointer;
-  overflow-wrap: anywhere;
+  transition: background-color 140ms ease-out, color 140ms ease-out;
 }
 
 #playlist-items li:hover {
   background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 #playlist-items li.active {
   background: var(--playlist-active-bg);
-  border-left: 3px solid var(--playlist-active-border);
+  color: var(--text-primary);
+  font-weight: 600;
 }
+
+.queue-index {
+  flex: 0 0 auto;
+  width: 1.8em;
+  color: var(--text-muted);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+#playlist-items li.active .queue-index {
+  color: var(--accent-primary);
+}
+
+/* An empty queue must not push the empty-state copy to the bottom. */
+#playlist-items:empty {
+  flex: 0 1 auto;
+}
+
+.queue-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlist-empty {
+  margin: 0;
+  padding: 18px 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.playlist-empty[hidden] {
+  display: none;
+}
+
+/* --- Footer ------------------------------------------------------------- */
 
 #app-footer {
   display: flex;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: var(--space-2);
+  padding: 12px 20px;
   border-top: 1px solid var(--border-color);
 }
 
-@media (max-width: 520px) {
-  #volume-slider,
-  #btn-subtitles,
-  #btn-pip,
-  #btn-fullscreen {
+@media (max-width: 980px) {
+  :root {
+    --sidebar-width: 280px;
+  }
+}
+
+@media (max-width: 899px) {
+  .main-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    align-content: start;
+    align-items: start;
+  }
+
+  /* Portrait tablets: keep the queue reachable without a taller player box. */
+  #playlist-sidebar {
+    max-height: 40vh;
+  }
+}
+
+@media (max-width: 560px) {
+  .main-layout {
+    padding: 14px;
+  }
+
+  #app-footer {
+    padding: 10px 14px;
+  }
+
+  #app-footer .btn {
+    flex: 1;
+  }
+
+  #volume-slider {
     display: none;
+  }
+
+  .transport-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .play-btn {
+    width: 40px;
+    height: 40px;
   }
 
   #time-display {
